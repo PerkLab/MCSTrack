@@ -271,3 +271,4 @@ class TestPoseSolver(unittest.TestCase):
         self.assertEqual(matrix[3, 1], 0.0)
         self.assertEqual(matrix[3, 2], 0.0)
         self.assertEqual(matrix[3, 3], 1.0)
+        self.assertEqual(matrix[3, 3], 1.0)
