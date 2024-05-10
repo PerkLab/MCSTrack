@@ -3,6 +3,7 @@ fastapi-utils
 hjson
 opencv-contrib-python==4.5.5.64
 pydantic~=1.10.15
+scipy
 uvicorn[standard]
 websocket
 websockets
