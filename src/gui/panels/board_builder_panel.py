@@ -9,6 +9,8 @@ import wx
 import wx.grid
 from cv2 import aruco
 import datetime
+import json
+import os
 
 from src.common.api.empty_response import EmptyResponse
 from src.common.api.error_response import ErrorResponse
@@ -28,7 +30,7 @@ from src.gui.panels.detector_panel import _CAPTURE_FORMAT
 
 from .base_panel import BasePanel
 from .feedback import ImagePanel
-from .parameters import ParameterSpinboxFloat, ParameterCheckbox
+from .parameters import ParameterSpinboxFloat, ParameterCheckbox, ParameterText
 
 from src.board_builder import BoardBuilder
 from src.common.structures import PoseSolverFrame, Pose, Matrix4x4
@@ -66,14 +68,17 @@ class BoardBuilderPanel(BasePanel):
 
     _controller: MCTController
 
-    _tracked_marker_diameter_spinbox: ParameterSpinboxFloat
-    _confirm_marker_size_button: wx.Button
     _preview_image_checkbox: ParameterCheckbox
     _annotate_detected_checkbox: ParameterCheckbox
     _annotate_rejected_checkbox: ParameterCheckbox
+    _tracked_marker_diameter_spinbox: ParameterSpinboxFloat
+    _confirm_parameters_button: wx.Button
+    _board_label: ParameterText
     _locate_reference_button: wx.Button
     _collect_data_button: wx.Button
     _build_board_button: wx.Button
+    _repeatability_testing_checkbox: ParameterCheckbox
+    _reset_button: wx.Button
     _live_markers_detected: list[MarkerSnapshot]
 
     _tracked_target_poses: list[Pose]
@@ -103,7 +108,7 @@ class BoardBuilderPanel(BasePanel):
         self._latest_pose_solver_frames = dict()
         self._live_markers_detected = list()
 
-        self.board_builder = BoardBuilder()
+        self.board_builder = None
         self._marker_size = 0
         self.marker_color = [
             (0, 0, 255),  # Red
@@ -134,24 +139,6 @@ class BoardBuilderPanel(BasePanel):
 
         control_sizer: wx.BoxSizer = wx.BoxSizer(orient=wx.VERTICAL)
 
-        self._tracked_marker_diameter_spinbox: ParameterSpinboxFloat = self.add_control_spinbox_float(
-            parent=control_panel,
-            sizer=control_sizer,
-            label="Marker diameter (mm)",
-            minimum_value=1.0,
-            maximum_value=1000.0,
-            initial_value=10.0,
-            step_value=0.5)
-
-        self._confirm_marker_size_button: wx.Button = self.add_control_button(
-            parent=control_panel,
-            sizer=control_sizer,
-            label="Confirm marker size")
-
-        self.add_horizontal_line_to_spacer(
-            parent=control_panel,
-            sizer=control_sizer)
-
         self.add_text_label(
             parent=control_panel,
             sizer=control_sizer,
@@ -173,6 +160,40 @@ class BoardBuilderPanel(BasePanel):
             parent=control_panel,
             sizer=control_sizer,
             label="Annotate Rejected")
+
+        self.add_horizontal_line_to_spacer(
+            parent=control_panel,
+            sizer=control_sizer)
+
+        self.add_text_label(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Parameters",
+            font_size_delta=2,
+            bold=True)
+
+        self._tracked_marker_diameter_spinbox: ParameterSpinboxFloat = self.add_control_spinbox_float(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Marker diameter (mm)",
+            minimum_value=1.0,
+            maximum_value=1000.0,
+            initial_value=10.0,
+            step_value=0.5)
+
+        self._board_label = self.add_control_text_input(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Board Label")
+
+        self._confirm_parameters_button: wx.Button = self.add_control_button(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Confirm parameters")
+
+        self.add_horizontal_line_to_spacer(
+            parent=control_panel,
+            sizer=control_sizer)
 
         self.add_text_label(
             parent=control_panel,
@@ -197,6 +218,40 @@ class BoardBuilderPanel(BasePanel):
             parent=control_panel,
             sizer=control_sizer,
             label="Build Board"
+        )
+
+        self.add_horizontal_line_to_spacer(
+            parent=control_panel,
+            sizer=control_sizer)
+
+        self.add_text_label(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Testing",
+            font_size_delta=2,
+            bold=True)
+
+        self._repeatability_testing_checkbox = self.add_control_checkbox(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Repeatability Testing")
+        self._repeatability_testing_checkbox.checkbox.Enable(False)
+
+        self.add_horizontal_line_to_spacer(
+            parent=control_panel,
+            sizer=control_sizer)
+
+        self.add_text_label(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Reset",
+            font_size_delta=2,
+            bold=True)
+
+        self._reset_button: wx.Button = self.add_control_button(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Reset"
         )
 
         control_spacer_sizer: wx.BoxSizer = wx.BoxSizer(orient=wx.HORIZONTAL)
@@ -244,9 +299,12 @@ class BoardBuilderPanel(BasePanel):
         self.SetSizerAndFit(sizer=self.horizontal_split_sizer)
 
         ### EVENT HANDLING ###
-        self._confirm_marker_size_button.Bind(
+        self._confirm_parameters_button.Bind(
             event=wx.EVT_BUTTON,
-            handler=self._on_confirm_marker_size_pressed)
+            handler=self._on_confirm_parameters_pressed)
+        self._board_label.Bind(
+            event=wx.EVT_TEXT,
+            handler=self._on_confirm_parameters_pressed)
         self._preview_image_checkbox.checkbox.Bind(
             event=wx.EVT_CHECKBOX,
             handler=self._on_display_mode_changed)
@@ -265,6 +323,12 @@ class BoardBuilderPanel(BasePanel):
         self._build_board_button.Bind(
             event=wx.EVT_BUTTON,
             handler=self._on_build_board_button_click)
+        self._repeatability_testing_checkbox.checkbox.Bind(
+            event=wx.EVT_CHECKBOX,
+            handler=self._on_repeatability_testing_checkbox_change)
+        self._reset_button.Bind(
+            event=wx.EVT_BUTTON,
+            handler=self._on_reset_button_click)
 
         self._locate_reference_button.Enable(False)
         self._collect_data_button.Enable(False)
@@ -298,13 +362,13 @@ class BoardBuilderPanel(BasePanel):
     def update_loop(self) -> None:
         super().update_loop()
 
-        response_series: MCTResponseSeries | None
-
         if self._renderer is not None:
             self._renderer.render()
 
         if self._controller.is_running():
             detector_data: dict[str, list[MarkerSnapshot]] = {}
+            should_refresh = False  # Add this flag
+
             for preview in self.live_detector_previews:
                 if preview.image_request_id is None:
                     self._begin_capture_snapshot(preview)
@@ -321,11 +385,16 @@ class BoardBuilderPanel(BasePanel):
                         request_series_id=preview.image_request_id)
                     if response_series is not None:  # self._live_preview_request_id will be None
                         self.handle_response_series(response_series)
+                        should_refresh = True  # Only refresh when new data is received
 
                 detector_data[detector_label] = preview.detector_frame.detected_marker_snapshots
+
             if detector_data:
                 self._run_board_builder(detector_data)
-        self.Refresh()
+                should_refresh = True
+
+            if should_refresh:
+                self.Refresh()  # Refresh only if new data is available
 
     # Used for updating the GUI camera preview
     def _begin_capture_snapshot(self, preview: LiveDetectorPreview):
@@ -381,8 +450,18 @@ class BoardBuilderPanel(BasePanel):
         return return_value
 
     def _on_build_board_button_click(self, event: wx.CommandEvent) -> None:
-        corners_dict = self.board_builder.build_board()
+        target_board = self.board_builder.build_board()
         self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
+
+        #print(target_board)
+        target_board_json = target_board.json(indent=4)
+        print(target_board_json)
+
+        # Write result to file
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'board_builder',
+                                 'board_builder_results', f'{self.board_builder.board_label}_result.json')
+        with open(file_path, 'w') as file:
+            file.write(target_board_json)
 
     def _on_collect_data_button_click(self, event: wx.CommandEvent) -> None:
         if self._collect_data_button.GetValue():
@@ -394,10 +473,13 @@ class BoardBuilderPanel(BasePanel):
             self._collect_data_button.SetLabel("Collect Data")
             self._collecting_data = False
 
-    def _on_confirm_marker_size_pressed(self, _event: wx.CommandEvent) -> None:
+    def _on_confirm_parameters_pressed(self, _event: wx.CommandEvent) -> None:
         self._marker_size = self._tracked_marker_diameter_spinbox.spinbox.GetValue()
-        self.board_builder.pose_solver.set_board_marker_size(self._marker_size)
+        self.board_builder = BoardBuilder(self._marker_size)
+        self.board_builder.pose_solver.set_board_marker_size(self._marker_size)  # Set board marker size
+        self.board_builder.board_label = self._board_label.textbox.GetValue()  # Set board name
         self._locate_reference_button.Enable(True)
+        self._repeatability_testing_checkbox.checkbox.Enable(True)
         for detector_label in self._controller.get_active_detector_labels():
             self._detector_intrinsics[detector_label] = self._controller.get_live_detector_intrinsics(detector_label)
 
@@ -441,6 +523,22 @@ class BoardBuilderPanel(BasePanel):
             self._locate_reference_button.SetLabel("Locate Reference")
             self._locating_reference = False
             self._collect_data_button.Enable(True)
+
+    def _on_repeatability_testing_checkbox_change(self, event:wx.CommandEvent):
+        if self._repeatability_testing_checkbox.checkbox.GetValue():
+            self.board_builder.repeatability_testing = True
+        else:
+            self.board_builder.repeatability_testing = False
+
+    def _on_reset_button_click(self, event: wx.CommandEvent) -> None:
+        self._locate_reference_button.Enable(False)
+        self._collect_data_button.Enable(False)
+        self._build_board_button.Enable(False)
+        self._locating_reference = False
+        self._collecting_data = False
+        self.board_builder = BoardBuilder(self._marker_size)
+        self._on_repeatability_testing_checkbox_change(event)
+        self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
 
     def _process_frame(self, preview: LiveDetectorPreview):
         # TODO: The Detector should tell us the resolution of the image it operated on.
@@ -515,15 +613,6 @@ class BoardBuilderPanel(BasePanel):
                         model_key=POSE_REPRESENTATIVE_MODEL,
                         transform_to_world=pose.object_to_reference_matrix)
 
-    def _reset(self) -> None:
-        logger.info("Reset button clicked")
-        self._locate_reference_button.Enable(False)
-        self._collect_data_button.Enable(False)
-        self._build_board_button.Enable(False)
-        self._locating_reference = False
-        self._collecting_data = False
-        self.board_builder = BoardBuilder()
-
     def _run_board_builder(self, detector_data):
         if self._locating_reference:
             for detector_name in self._detector_intrinsics:
@@ -532,5 +621,5 @@ class BoardBuilderPanel(BasePanel):
             self.board_builder.locate_reference_board(detector_data)
 
         elif self._collecting_data:
-            corners_dict = self.board_builder.collect_data(detector_data)
+            self.board_builder.collect_data(detector_data)
             self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)

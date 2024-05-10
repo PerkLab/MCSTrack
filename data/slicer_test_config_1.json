@@ -1,0 +1,128 @@
+{
+  "startup_mode": "detecting_and_solving",
+  "detectors": [
+    {
+      "label": "d101",
+      "ip_address": "192.168.0.101",
+      "port": 8001,
+      "camera_parameters": [
+        {
+          "key": "FramesPerSecond",
+          "value": 30.0
+        },
+        {
+          "key": "Gain",
+          "value": 16.0
+        },
+        {
+          "key": "AutoExposureGain",
+          "value": false
+        },
+        {
+          "key": "Exposure (us)",
+          "value": 2000
+        },
+        {
+          "key": "Brightness",
+          "value": 0.1
+        },
+        {
+          "key": "Contrast",
+          "value": 1.0
+        },
+        {
+          "key": "Sharpness",
+          "value": 1.0
+        }
+      ],
+      "marker_parameters": [
+        {
+          "key": "cornerRefinementMethod",
+          "value": "SUBPIX"
+        }
+      ],
+      "fixed_transform_to_reference":
+      {
+        "values": [
+          -0.17424811713221883,
+          -0.5384339232294528,
+          0.8244552771324932,
+          647.8448669433594,
+          0.9793105594802856,
+          -0.007264050200192773,
+          0.20223269188016801,
+          319.42423782348635,
+          -0.10290005717338768,
+          0.8426364244977953,
+          0.528559773671138,
+          374.32372589111327,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+      ]
+      }
+    },
+    {
+      "label": "d102",
+      "ip_address": "192.168.0.102",
+      "port": 8001,
+      "camera_parameters": [
+        {
+          "key": "FramesPerSecond",
+          "value": 30.0
+        },
+        {
+          "key": "Gain",
+          "value": 16.0
+        },
+        {
+          "key": "AutoExposureGain",
+          "value": false
+        },
+        {
+          "key": "Exposure (us)",
+          "value": 2000
+        },
+        {
+          "key": "Brightness",
+          "value": 0.1
+        },
+        {
+          "key": "Contrast",
+          "value": 1.0
+        },
+        {
+          "key": "Sharpness",
+          "value": 1.0
+        }
+      ],
+      "marker_parameters": [
+        {
+          "key": "cornerRefinementMethod",
+          "value": "SUBPIX"
+        }
+      ],
+      "fixed_transform_to_reference": {
+        "values": [
+          0.1808964725570389,
+          -0.520314593131516,
+          0.8345952254780791,
+          635.3875076293946,
+          0.9716493259091376,
+          -0.03680026542350834,
+          -0.23354513038185565,
+          -145.30454483032227,
+          0.1522302653112682,
+          0.8531813785117115,
+          0.49890628547264915,
+          346.73107986450196,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+      ]
+      }
+    }
+  ]
+}
