@@ -1,47 +1,51 @@
-import numpy as np
 import datetime
-from .utils.board_builder_pose_solver import BoardBuilderPoseSolver
-from .structures.pose_location import PoseLocation
-from src.common.structures import Pose, MarkerSnapshot, MarkerCorners, Matrix4x4
+import json
+import os
+import numpy as np
+
 from collections import defaultdict
 from typing import Final
 
+from .utils import BoardBuilderPoseSolver
+from .structures import PoseLocation
+from src.common.structures import Pose, MarkerSnapshot, MarkerCorners, Matrix4x4
+from ..pose_solver.structures import Marker, TargetBoard
 
 _HOMOGENEOUS_POINT_COORD: Final[int] = 4
-_MARKER_MIDDLE_TO_EDGE_IN_PIXELS: Final[float] = 20.0
-
 
 class BoardBuilder:
     _detector_poses_median: dict[str, PoseLocation]
     _detector_poses: list[Pose]
     _target_poses: list[Pose]
-    _visible_markers: list[str]
-    _target_markers: list[str]
     _index_to_marker_uuid: dict[int, str]
+    _index_to_marker_id: dict[int, str]
 
-    _relative_pose_matrix = list[list[PoseLocation | None]]  # Indexed as [row_index][col_index]
-    _local_corners = list[list[int]]  # Indexed as [point_index][coordinate_index]
+    _matrix_id_index: int
+    _matrix_uuid_index: int
+    relative_pose_matrix = list[list[PoseLocation | None]]  # Indexed as [row_index][col_index]
+    local_corners = list[list[int]]  # Indexed as [point_index][coordinate_index]
 
-    def __init__(self):
+    def __init__(self, marker_size):
 
         # pose solver init
         self._detector_poses_median = dict()
         self.detector_poses = list()
         self.target_poses = list()
-        self._visible_markers = list()
+        self.marker_size = marker_size
+        # TODO: Could combine the following into something like dict[index, list[id, uuid]] to be more clean
         self._index_to_marker_uuid = dict()
-        self._target_markers = list()
+        self._index_to_marker_id = dict()
         self.pose_solver = BoardBuilderPoseSolver()
 
         # matrix init
-        self._matrix_index = 0
-        self._relative_pose_matrix = list()
-        # TODO: Will need to be calculated rather than hard coded
+        self._matrix_id_index = 0
+        self._matrix_uuid_index = 0
+        self.relative_pose_matrix = list()
         self.local_corners = [
-            [-_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, _MARKER_MIDDLE_TO_EDGE_IN_PIXELS, 0, 1],  # Top-left
-            [_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, _MARKER_MIDDLE_TO_EDGE_IN_PIXELS, 0, 1],  # Top-right
-            [_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, -_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, 0, 1],  # Bottom-right
-            [-_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, -_MARKER_MIDDLE_TO_EDGE_IN_PIXELS, 0, 1]]  # Bottom-left
+            [-marker_size / 2, marker_size / 2, 0, 1],  # Top-left
+            [marker_size / 2, marker_size / 2, 0, 1],  # Top-right
+            [marker_size / 2, -marker_size / 2, 0, 1],  # Bottom-right
+            [-marker_size / 2, -marker_size / 2, 0, 1]]  # Bottom-left
 
     @staticmethod
     def _calculate_corners_location(
@@ -76,12 +80,12 @@ class BoardBuilder:
 
     def _expand_relative_pose_matrix(self):
         """ Adds one row and one column to the matrix and initializes them to None """
-        size = len(self._relative_pose_matrix) + 1
+        size = len(self.relative_pose_matrix) + 1
         new_matrix = [[None for _ in range(size)] for _ in range(size)]
         for i in range(size - 1):
             for j in range(size - 1):
-                new_matrix[i][j] = self._relative_pose_matrix[i][j]
-        self._relative_pose_matrix = new_matrix
+                new_matrix[i][j] = self.relative_pose_matrix[i][j]
+        self.relative_pose_matrix = new_matrix
 
     @staticmethod
     def _filter_markers_appearing_in_multiple_detectors(data):
@@ -124,10 +128,11 @@ class BoardBuilder:
         timestamp = datetime.datetime.utcnow()
         for detector_name in detector_data:
             for marker_snapshot in detector_data[detector_name]:
-                if marker_snapshot.label not in self._target_markers:
-                    self._target_markers.append(marker_snapshot.label)
+                if marker_snapshot.label not in list(self._index_to_marker_id.values()):
                     self.pose_solver.add_target_marker(int(marker_snapshot.label))
                     self._expand_relative_pose_matrix()
+                    self._index_to_marker_id[self._matrix_id_index] = marker_snapshot.label
+                    self._matrix_id_index += 1
 
         for detector_name in detector_data:
             for marker_snapshot in detector_data[detector_name]:
@@ -144,13 +149,34 @@ class BoardBuilder:
 
         target_poses = self.pose_solver.get_target_poses()
         self.target_poses = target_poses
-        visible_markers = []
         for pose in target_poses:
-            visible_markers.append(pose.target_id)
             if pose.target_id not in list(self._index_to_marker_uuid.values()):
-                self._index_to_marker_uuid[self._matrix_index] = pose.target_id
-                self._matrix_index += 1
-        self._visible_markers = visible_markers
+                self._index_to_marker_uuid[self._matrix_uuid_index] = pose.target_id
+                self._matrix_uuid_index += 1
+
+    @staticmethod
+    def _write_corners_dict_to_repeatability_test_file(corners_dict):
+        corners_dict_serializable = {k: v.tolist() for k, v in corners_dict.items()}
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        repeatability_dir = os.path.join(script_dir, 'test', 'repeatability')
+        if not os.path.exists(repeatability_dir):
+            os.makedirs(repeatability_dir)
+        file_path = os.path.join(repeatability_dir, 'data.json')
+
+        data = []
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as file:
+                try:
+                    data = json.load(file)
+                    if not isinstance(data, list):
+                        data = []
+                except json.JSONDecodeError:
+                    data = []
+        data.append(corners_dict_serializable)
+
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=4)
 
     # public methods
     def locate_reference_board(self, detector_data: dict[str, list[MarkerSnapshot]]):
@@ -209,17 +235,17 @@ class BoardBuilder:
                     other_matrix_values = other_pose.object_to_reference_matrix.values
                     other_pose_matrix = np.array(other_matrix_values).reshape(4, 4)
                     relative_transform = self._calculate_relative_transform(pose_matrix, other_pose_matrix)
-                    matrix_index = self._find_matrix_input_index(pose.target_id, other_pose.target_id)
+                    matrix_uuid_index = self._find_matrix_input_index(pose.target_id, other_pose.target_id)
 
-                    if not self._relative_pose_matrix[matrix_index[0]][matrix_index[1]]:
+                    if not self.relative_pose_matrix[matrix_uuid_index[0]][matrix_uuid_index[1]]:
                         new_pose_location = PoseLocation(pose.target_id)
                         new_pose_location.add_matrix(relative_transform, timestamp.isoformat())
-                        self._relative_pose_matrix[matrix_index[0]][matrix_index[1]] = new_pose_location
+                        self.relative_pose_matrix[matrix_uuid_index[0]][matrix_uuid_index[1]] = new_pose_location
                     else:
-                        self._relative_pose_matrix[matrix_index[0]][matrix_index[1]].add_matrix(
+                        self.relative_pose_matrix[matrix_uuid_index[0]][matrix_uuid_index[1]].add_matrix(
                             relative_transform,
                             timestamp.isoformat())
-                    self._relative_pose_matrix[matrix_index[0]][matrix_index[1]].frame_count += 1
+                    self.relative_pose_matrix[matrix_uuid_index[0]][matrix_uuid_index[1]].frame_count += 1
 
         for index, pose in enumerate(self.target_poses):
             pose_values = pose.object_to_reference_matrix.values
@@ -228,29 +254,48 @@ class BoardBuilder:
             corners_dict[pose.target_id] = corners_location
         return corners_dict
 
-    def build_board(self):
-        predicted_corners = {}
-        self.target_poses = []
-        relative_pose_matrix = [[entry.get_matrix() if entry is not None else None for entry in row] for
-                                row in self._relative_pose_matrix]
+    def build_board(self, repeatability_testing=False):
+        # TODO: Build board isn't currently able to get the positions of markers with no direct relation with the
+        #  reference (appeared in the same frame more than once). A search algorithm needs to be developed
 
-        # TODO: Current reference/origin marker is hard coded to the first marker of the matrix
-        reference_face = 0
+        if not self.relative_pose_matrix:
+            return
+        self.target_poses = []
+        predicted_corners = {}
+        relative_pose_matrix = [[entry.get_matrix() if entry is not None else None for entry in row] for
+                                row in self.relative_pose_matrix]
+
+        # TODO: Current reference/origin marker is coded to the index with the lowest marker id. An algorithm could be
+        #  developed to determine "most reliable marker" to put as the root of the search tree
+        index_with_smallest_value = min(self._index_to_marker_id, key=self._index_to_marker_id.get)
+        reference_face = self._index_to_marker_id[index_with_smallest_value]
         identity_matrix = np.eye(4)
 
-        for i in range(len(relative_pose_matrix)):
-            if i == reference_face:
+        for index, marker_id in self._index_to_marker_id.items():
+            if marker_id == reference_face:
                 # No transformation needed for the reference face
                 corners = self._calculate_corners_location(identity_matrix, self.local_corners)
             else:
                 # Transformation from face i to reference face
-                T = relative_pose_matrix[reference_face][i]
+                T = relative_pose_matrix[index_with_smallest_value][index]
+                if T is None:
+                    continue
                 pose = Pose(
-                    target_id=i,
+                    target_id=marker_id,
                     object_to_reference_matrix=Matrix4x4.from_numpy_array(np.array(T)),
                     solver_timestamp_utc_iso8601=str(datetime.datetime.utcnow()))
                 self.target_poses.append(pose)
                 corners = self._calculate_corners_location(T, self.local_corners)
-            predicted_corners[i] = corners
+            predicted_corners[marker_id] = corners
 
-        return predicted_corners
+        if repeatability_testing:
+            self._write_corners_dict_to_repeatability_test_file(predicted_corners)
+
+        # Convert to target board
+        markers = []
+        for marker_id, points in predicted_corners.items():
+            # Ensure points is a list of lists
+            points = [list(point) for point in points]
+            marker = Marker(marker_id=marker_id, points=points)
+            markers.append(marker)
+        return TargetBoard(target_id='board 1', markers=markers)

@@ -138,7 +138,7 @@ class Ray:
         self.direction = direction
 
 
-class _Marker(BaseModel):
+class Marker(BaseModel):
     marker_id: str = Field()
     marker_size: float | None = Field(default=None)
     points: list[list[float]] | None = Field(default=None)
@@ -182,7 +182,7 @@ class TargetBase(BaseModel, abc.ABC):
     def get_points(self) -> list[list[float]]: ...
 
 
-class TargetMarker(TargetBase, _Marker):
+class TargetMarker(TargetBase, Marker):
     def get_marker_ids(self) -> list[str]:
         return [self.marker_id]
 
@@ -191,7 +191,7 @@ class TargetMarker(TargetBase, _Marker):
 
 
 class TargetBoard(TargetBase):
-    markers: list[_Marker] = Field()
+    markers: list[Marker] = Field()
 
     def get_marker_ids(self) -> list[str]:
         return [marker.marker_id for marker in self.markers]

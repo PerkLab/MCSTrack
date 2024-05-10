@@ -9,6 +9,8 @@ import wx
 import wx.grid
 from cv2 import aruco
 import datetime
+import json
+import os
 
 from src.common.api.empty_response import EmptyResponse
 from src.common.api.error_response import ErrorResponse
@@ -74,6 +76,7 @@ class BoardBuilderPanel(BasePanel):
     _locate_reference_button: wx.Button
     _collect_data_button: wx.Button
     _build_board_button: wx.Button
+    _reset_button: wx.Button
     _live_markers_detected: list[MarkerSnapshot]
 
     _tracked_target_poses: list[Pose]
@@ -103,7 +106,7 @@ class BoardBuilderPanel(BasePanel):
         self._latest_pose_solver_frames = dict()
         self._live_markers_detected = list()
 
-        self.board_builder = BoardBuilder()
+        self.board_builder = None
         self._marker_size = 0
         self.marker_color = [
             (0, 0, 255),  # Red
@@ -199,6 +202,23 @@ class BoardBuilderPanel(BasePanel):
             label="Build Board"
         )
 
+        self.add_horizontal_line_to_spacer(
+            parent=control_panel,
+            sizer=control_sizer)
+
+        self.add_text_label(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Reset",
+            font_size_delta=2,
+            bold=True)
+
+        self._reset_button: wx.Button = self.add_control_button(
+            parent=control_panel,
+            sizer=control_sizer,
+            label="Reset"
+        )
+
         control_spacer_sizer: wx.BoxSizer = wx.BoxSizer(orient=wx.HORIZONTAL)
         control_sizer.Add(
             sizer=control_spacer_sizer,
@@ -265,6 +285,9 @@ class BoardBuilderPanel(BasePanel):
         self._build_board_button.Bind(
             event=wx.EVT_BUTTON,
             handler=self._on_build_board_button_click)
+        self._reset_button.Bind(
+            event=wx.EVT_BUTTON,
+            handler=self._on_reset_button_click)
 
         self._locate_reference_button.Enable(False)
         self._collect_data_button.Enable(False)
@@ -381,8 +404,23 @@ class BoardBuilderPanel(BasePanel):
         return return_value
 
     def _on_build_board_button_click(self, event: wx.CommandEvent) -> None:
-        corners_dict = self.board_builder.build_board()
+        target_board = self.board_builder.build_board(repeatability_testing=False)  # Put as True if data is needed for repeatability testing
         self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
+        target_board_json = {
+            "target_id": target_board.target_id,
+            "markers": [
+                {
+                    "marker_id": marker.marker_id,
+                    "marker_size": self._marker_size,
+                    "points": marker.points
+                } for marker in target_board.markers
+            ]
+        }
+        # Write result to file
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'board_builder',
+                                 'board_builder_results.json')
+        with open(file_path, 'w') as file:
+            json.dump(target_board_json, file, indent=4)
 
     def _on_collect_data_button_click(self, event: wx.CommandEvent) -> None:
         if self._collect_data_button.GetValue():
@@ -396,6 +434,7 @@ class BoardBuilderPanel(BasePanel):
 
     def _on_confirm_marker_size_pressed(self, _event: wx.CommandEvent) -> None:
         self._marker_size = self._tracked_marker_diameter_spinbox.spinbox.GetValue()
+        self.board_builder = BoardBuilder(self._marker_size)
         self.board_builder.pose_solver.set_board_marker_size(self._marker_size)
         self._locate_reference_button.Enable(True)
         for detector_label in self._controller.get_active_detector_labels():
@@ -441,6 +480,15 @@ class BoardBuilderPanel(BasePanel):
             self._locate_reference_button.SetLabel("Locate Reference")
             self._locating_reference = False
             self._collect_data_button.Enable(True)
+
+    def _on_reset_button_click(self, event: wx.CommandEvent) -> None:
+        self._locate_reference_button.Enable(False)
+        self._collect_data_button.Enable(False)
+        self._build_board_button.Enable(False)
+        self._locating_reference = False
+        self._collecting_data = False
+        self.board_builder = BoardBuilder(self._marker_size)
+        self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
 
     def _process_frame(self, preview: LiveDetectorPreview):
         # TODO: The Detector should tell us the resolution of the image it operated on.
@@ -515,15 +563,6 @@ class BoardBuilderPanel(BasePanel):
                         model_key=POSE_REPRESENTATIVE_MODEL,
                         transform_to_world=pose.object_to_reference_matrix)
 
-    def _reset(self) -> None:
-        logger.info("Reset button clicked")
-        self._locate_reference_button.Enable(False)
-        self._collect_data_button.Enable(False)
-        self._build_board_button.Enable(False)
-        self._locating_reference = False
-        self._collecting_data = False
-        self.board_builder = BoardBuilder()
-
     def _run_board_builder(self, detector_data):
         if self._locating_reference:
             for detector_name in self._detector_intrinsics:
@@ -532,5 +571,5 @@ class BoardBuilderPanel(BasePanel):
             self.board_builder.locate_reference_board(detector_data)
 
         elif self._collecting_data:
-            corners_dict = self.board_builder.collect_data(detector_data)
+            self.board_builder.collect_data(detector_data)
             self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
