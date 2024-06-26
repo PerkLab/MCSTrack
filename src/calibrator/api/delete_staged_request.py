@@ -1,8 +1,8 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from pydantic import Field
 
 
-class DeleteStagedRequest(MCastRequest):
+class DeleteStagedRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "clear_calibration_data_staged_for_deletion"

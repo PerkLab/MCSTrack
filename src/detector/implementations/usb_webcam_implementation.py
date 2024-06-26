@@ -1,14 +1,12 @@
 from src.detector.api import \
-    GetCaptureDeviceResponse, \
     GetCapturePropertiesResponse, \
-    SetCaptureDeviceRequest, \
     SetCapturePropertiesRequest
 from src.detector.exceptions import UpdateCaptureError
 from src.common import \
     EmptyResponse, \
     ErrorResponse, \
     get_kwarg, \
-    MCastResponse
+    MCTResponse
 from src.common.structures.capture_status import CaptureStatus
 
 from src.detector.implementations import AbstractCameraInterface
@@ -70,29 +68,6 @@ class USBWebcamWithOpenCV(AbstractCameraInterface):
 
         self._captured_timestamp_utc = datetime.datetime.utcnow()
 
-    def set_capture_device(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        """
-        :key request: SetCaptureDeviceRequest
-        """
-
-        request: SetCaptureDeviceRequest = get_kwarg(
-            kwargs=kwargs,
-            key="request",
-            arg_type=SetCaptureDeviceRequest)
-
-        input_device_id: int | str = request.capture_device_id
-        if input_device_id.isnumeric():
-            input_device_id = int(input_device_id)
-        if self._capture_device_id != input_device_id:
-            self._capture_device_id = input_device_id
-            if self._capture is not None:
-                self._capture.release()
-                self._capture = self._detect_os_and_open_video(input_device_id)
-                if not self._capture.isOpened():
-                    return ErrorResponse(
-                        message=f"Failed to open capture device {input_device_id}")
-        return EmptyResponse()
-
     # noinspection DuplicatedCode
     def set_capture_properties(self, **kwargs) -> EmptyResponse:
         """
@@ -125,9 +100,6 @@ class USBWebcamWithOpenCV(AbstractCameraInterface):
                 self._capture.set(cv2.CAP_PROP_GAMMA, float(request.gamma))
         return EmptyResponse()
 
-    def get_capture_device(self, **_kwargs) -> GetCaptureDeviceResponse:
-        return GetCaptureDeviceResponse(capture_device_id=str(self._capture_device_id))
-
     def get_capture_properties(self, **_kwargs) -> GetCapturePropertiesResponse | ErrorResponse:
         if self._capture is None:
             return ErrorResponse(
@@ -145,7 +117,7 @@ class USBWebcamWithOpenCV(AbstractCameraInterface):
                 gamma=int(self._capture.get(cv2.CAP_PROP_GAMMA)))
         # TODO: Get powerline_frequency_hz and backlight_compensation
 
-    def start_capture(self, **kwargs) -> MCastResponse:
+    def start_capture(self, **kwargs) -> MCTResponse:
         if isinstance(self._capture_device_id, str) and self._capture_device_id.isnumeric():
             self._capture_device_id.isnumeric = int(self._capture_device_id)
         if self._capture is not None:
@@ -162,7 +134,7 @@ class USBWebcamWithOpenCV(AbstractCameraInterface):
         self._capture_status.status = CaptureStatus.Status.RUNNING
         return EmptyResponse()
 
-    def stop_capture(self, **kwargs) -> MCastResponse:
+    def stop_capture(self, **kwargs) -> MCTResponse:
         if self._capture is not None:
             self._capture.release()
             self._capture = None

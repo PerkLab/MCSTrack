@@ -1,8 +1,8 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from pydantic import Field
 
 
-class SetReferenceMarkerRequest(MCastRequest):
+class SetReferenceMarkerRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "set_reference_marker"

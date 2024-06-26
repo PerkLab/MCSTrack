@@ -1,8 +1,8 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from pydantic import Field
 
 
-class GetMarkerSnapshotsRequest(MCastRequest):
+class GetMarkerSnapshotsRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_marker_snapshots"

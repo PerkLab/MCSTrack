@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import DetectionParameters
 from pydantic import Field
 
 
-class SetDetectionParametersRequest(MCastRequest):
+class SetDetectionParametersRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "set_detection_parameters"

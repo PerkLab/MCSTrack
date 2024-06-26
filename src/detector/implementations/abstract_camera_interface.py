@@ -3,9 +3,8 @@ from src.common import \
     EmptyResponse, \
     ErrorResponse, \
     get_kwarg, \
-    MCastResponse
+    MCTResponse
 from src.detector.api import \
-    GetCaptureDeviceResponse, \
     GetCapturePropertiesResponse, \
     GetCaptureImageResponse, \
     GetCaptureImageRequest
@@ -27,22 +26,16 @@ class AbstractCameraInterface(abc.ABC):
     def internal_update_capture(self) -> None:
         pass
 
-    def set_capture_device(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        pass
-        
     def set_capture_properties(self, **kwargs) -> EmptyResponse:
-        pass
-
-    def get_capture_device(self, **_kwargs) -> GetCaptureDeviceResponse:
         pass
 
     def get_capture_properties(self, **_kwargs) -> GetCapturePropertiesResponse | ErrorResponse:
         pass
 
-    def start_capture(self, **kwargs) -> MCastResponse:
+    def start_capture(self, **kwargs) -> MCTResponse:
         pass
 
-    def stop_capture(self, **kwargs) -> MCastResponse:
+    def stop_capture(self, **kwargs) -> MCTResponse:
         pass
 
     def get_capture_image(self, **kwargs) -> GetCaptureImageResponse:

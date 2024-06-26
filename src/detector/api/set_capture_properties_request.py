@@ -1,8 +1,8 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from pydantic import Field
 
 
-class SetCapturePropertiesRequest(MCastRequest):
+class SetCapturePropertiesRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "set_capture_properties"

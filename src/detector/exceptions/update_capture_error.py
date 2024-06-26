@@ -1,8 +1,8 @@
-from src.common.exceptions import MCastError
+from src.common.exceptions import MCTError
 from src.common.structures import SeverityLabel
 
 
-class UpdateCaptureError(MCastError):
+class UpdateCaptureError(MCTError):
     severity: SeverityLabel
     message: str
 

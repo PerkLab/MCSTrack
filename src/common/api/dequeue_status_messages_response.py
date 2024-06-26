@@ -1,9 +1,9 @@
-from .mcast_response import MCastResponse
+from .mct_response import MCTResponse
 from src.common.structures.status_message import StatusMessage
 from pydantic import Field
 
 
-class DequeueStatusMessagesResponse(MCastResponse):
+class DequeueStatusMessagesResponse(MCTResponse):
 
     @staticmethod
     def parsable_type_identifier() -> str:

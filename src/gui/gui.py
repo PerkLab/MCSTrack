@@ -1,11 +1,11 @@
 from src.gui.panels import \
     BasePanel, \
     CalibratorPanel, \
-    ConnectorPanel, \
+    ControllerPanel, \
     DetectorPanel, \
     PoseSolverPanel
 from src.common import StatusMessageSource
-from src.connector import Connector
+from src.controller import MCTController
 import asyncio
 import logging
 import wx
@@ -13,7 +13,7 @@ import wxasync
 from typing import Final
 
 
-CONNECTOR_LABEL: Final[str] = "Connector"
+CONTROLLER_LABEL: Final[str] = "Controller"
 DETECTOR_LABEL: Final[str] = "Detector"
 CALIBRATOR_LABEL: Final[str] = "Calibrator"
 POSE_SOLVER_LABEL: Final[str] = "Pose Solver"
@@ -23,17 +23,17 @@ POSE_SOLVER_LABEL: Final[str] = "Pose Solver"
 class ControllerFrame(wx.Frame):
 
     _status_message_source: StatusMessageSource
-    _connector: Connector
+    _controller: MCTController
 
     _notebook: wx.Notebook
-    _connector_panel: ConnectorPanel
+    _controller_panel: ControllerPanel
     _detector_panel: DetectorPanel
     _calibrator_panel: CalibratorPanel
     _pose_solver_panel: PoseSolverPanel
 
     def __init__(
         self,
-        connector: Connector,
+        controller: MCTController,
         *args,
         **kwargs
     ):
@@ -42,9 +42,9 @@ class ControllerFrame(wx.Frame):
         self._status_message_source = StatusMessageSource(
             source_label="gui",
             send_to_logger=True)
-        self._connector = connector
+        self._controller = controller
 
-        self.SetMinSize(wx.Size(640, 480))
+        self.SetMinSize(wx.Size(800, 600))
 
         frame_panel = wx.Panel(self)
         self._notebook = wx.Notebook(frame_panel)
@@ -54,19 +54,19 @@ class ControllerFrame(wx.Frame):
             wx.SizerFlags(1).Expand())
         frame_panel.SetSizerAndFit(frame_panel_sizer)
 
-        self._connector_panel = ConnectorPanel(
+        self._controller_panel = ControllerPanel(
             parent=self._notebook,
-            connector=self._connector,
+            controller=self._controller,
             status_message_source=self._status_message_source)
         self._notebook.AddPage(
-            page=self._connector_panel,
-            text=CONNECTOR_LABEL,
+            page=self._controller_panel,
+            text=CONTROLLER_LABEL,
             select=True)
-        self._connector_panel.panel_is_selected = True
+        self._controller_panel.panel_is_selected = True
 
         self._detector_panel = DetectorPanel(
             parent=self._notebook,
-            connector=self._connector,
+            controller=self._controller,
             status_message_source=self._status_message_source)
         self._notebook.AddPage(
             page=self._detector_panel,
@@ -75,7 +75,7 @@ class ControllerFrame(wx.Frame):
 
         self._calibrator_panel = CalibratorPanel(
             parent=self._notebook,
-            connector=self._connector,
+            controller=self._controller,
             status_message_source=self._status_message_source)
         self._notebook.AddPage(
             page=self._calibrator_panel,
@@ -84,7 +84,7 @@ class ControllerFrame(wx.Frame):
 
         self._pose_solver_panel = PoseSolverPanel(
             parent=self._notebook,
-            connector=self._connector,
+            controller=self._controller,
             status_message_source=self._status_message_source)
         self._notebook.AddPage(
             page=self._pose_solver_panel,
@@ -100,7 +100,7 @@ class ControllerFrame(wx.Frame):
 
     def on_page_changed(self, event: wx.BookCtrlEvent):
         pages: list[BasePanel] = [
-            self._connector_panel,
+            self._controller_panel,
             self._detector_panel,
             self._calibrator_panel,
             self._pose_solver_panel]
@@ -116,32 +116,32 @@ class ControllerFrame(wx.Frame):
                 break
 
 
-async def connector_frame_repeat(connector: Connector):
+async def controller_frame_repeat(controller: MCTController):
     # noinspection PyBroadException
     try:
-        await connector.do_update_frames_for_connections()
+        await controller.update()
     except Exception as e:
-        connector.add_status_message(
+        controller.add_status_message(
             severity="error",
-            message=f"Exception occurred in connector loop: {str(e)}")
+            message=f"Exception occurred in controller loop: {str(e)}")
     event_loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-    event_loop.create_task(connector_frame_repeat(connector=connector))
+    event_loop.create_task(controller_frame_repeat(controller=controller))
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
 
-    connector = Connector(
-        serial_identifier="connector",
+    controller = MCTController(
+        serial_identifier="controller",
         send_status_messages_to_logger=True)
     event_loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-    event_loop.create_task(connector_frame_repeat(connector=connector))
+    event_loop.create_task(controller_frame_repeat(controller=controller))
 
     app: wxasync.WxAsyncApp = wxasync.WxAsyncApp()
     frame: ControllerFrame = ControllerFrame(
-        connector=connector,
+        controller=controller,
         parent=None,
-        title="MCAST Controller")
+        title="MCT Controller")
     frame.Show()
     await app.MainLoop()
 

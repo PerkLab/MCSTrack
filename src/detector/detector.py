@@ -1,6 +1,4 @@
 from src.detector.api import \
-    GetCaptureDeviceRequest, \
-    GetCaptureDeviceResponse, \
     GetCaptureImageRequest, \
     GetCaptureImageResponse, \
     GetCapturePropertiesRequest, \
@@ -9,7 +7,6 @@ from src.detector.api import \
     GetDetectionParametersResponse, \
     GetMarkerSnapshotsRequest, \
     GetMarkerSnapshotsResponse, \
-    SetCaptureDeviceRequest, \
     SetCapturePropertiesRequest, \
     SetDetectionParametersRequest, \
     StartCaptureRequest, \
@@ -32,9 +29,9 @@ from src.calibrator.api import \
 from src.common import \
     EmptyResponse, \
     ErrorResponse, \
-    MCastComponent, \
-    MCastRequest, \
-    MCastResponse
+    MCTComponent, \
+    MCTRequest, \
+    MCTResponse
 from src.common.structures.capture_status import CaptureStatus
 from src.common.structures.marker_status import MarkerStatus
 import logging
@@ -46,7 +43,7 @@ from src.detector.implementations import \
 
 logger = logging.getLogger(__name__)
 
-class Detector(MCastComponent):
+class Detector(MCTComponent):
 
     _detector_configuration: DetectorConfiguration
     _calibrator: Calibrator
@@ -87,17 +84,15 @@ class Detector(MCastComponent):
         if self._frame_count % 1000 == 0:
             print(f"Update count: {self._frame_count}")
 
-    def supported_request_types(self) -> dict[type[MCastRequest], Callable[[dict], MCastResponse]]:
-        return_value: dict[type[MCastRequest], Callable[[dict], MCastResponse]] = super().supported_request_types()
+    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
+        return_value: dict[type[MCTRequest], Callable[[dict], MCTResponse]] = super().supported_request_types()
         return_value.update({
 
             # Detector Requests
-            GetCaptureDeviceRequest: self.get_capture_device,
             GetCaptureImageRequest: self.get_capture_image,
             GetCapturePropertiesRequest: self.get_capture_properties,
             GetDetectionParametersRequest: self.get_detection_parameters,
             GetMarkerSnapshotsRequest: self.get_marker_snapshots,
-            SetCaptureDeviceRequest: self.set_capture_device,
             SetCapturePropertiesRequest: self.set_capture_properties,
             SetDetectionParametersRequest: self.set_detection_parameters,
             StartCaptureRequest: self.start_capture,
@@ -125,14 +120,8 @@ class Detector(MCastComponent):
                 severity=e.severity,
                 message=e.message)
 
-    def set_capture_device(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        return self._camera_interface.set_capture_device(**kwargs)
-        
     def set_capture_properties(self, **kwargs) -> EmptyResponse:
         return self._camera_interface.set_capture_properties(**kwargs)
-
-    def get_capture_device(self, **_kwargs) -> GetCaptureDeviceResponse:
-        return self._camera_interface.get_capture_device(**_kwargs)
 
     def get_capture_properties(self, **_kwargs) -> GetCapturePropertiesResponse | ErrorResponse:
         return self._camera_interface.get_capture_properties(**_kwargs)
@@ -140,10 +129,10 @@ class Detector(MCastComponent):
     def get_capture_image(self, **kwargs) -> GetCaptureImageResponse:
         return self._camera_interface.get_capture_image(**kwargs)
 
-    def start_capture(self, **kwargs) -> MCastResponse:
+    def start_capture(self, **kwargs) -> MCTResponse:
         return self._camera_interface.start_capture(**kwargs)
 
-    def stop_capture(self, **kwargs) -> MCastResponse:
+    def stop_capture(self, **kwargs) -> MCTResponse:
         return self._camera_interface.stop_capture(**kwargs)
     
     # Marker

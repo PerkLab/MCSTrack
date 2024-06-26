@@ -3,9 +3,9 @@ from src.common import \
     ErrorResponse, \
     get_kwarg, \
     ImageCoding, \
-    MCastComponent, \
-    MCastRequest, \
-    MCastResponse
+    MCTComponent, \
+    MCTRequest, \
+    MCTResponse
 from src.common.structures import \
     DetectorResolution, \
     ImageResolution, \
@@ -86,8 +86,8 @@ class Calibrator:
             self.add_status_message(severity="critical", message=message)
             raise RuntimeError(message)
 
-    def supported_request_types(self) -> dict[type[MCastRequest], Callable[[dict], MCastResponse]]:
-        return_value: dict[type[MCastRequest], Callable[[dict], MCastResponse]] = super().supported_request_types()
+    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
+        return_value: dict[type[MCTRequest], Callable[[dict], MCTResponse]] = super().supported_request_types()
         return return_value
 
     def add_calibration_image(self, **kwargs) -> AddCalibrationImageResponse | ErrorResponse:

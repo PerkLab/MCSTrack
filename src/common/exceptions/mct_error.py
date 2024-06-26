@@ -1,3 +1,3 @@
-class MCastError(Exception):
+class MCTError(Exception):
     def __init__(self, *args):
         super().__init__(*args)

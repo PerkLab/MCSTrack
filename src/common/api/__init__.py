@@ -2,8 +2,8 @@ from .dequeue_status_messages_request import DequeueStatusMessagesRequest
 from .dequeue_status_messages_response import DequeueStatusMessagesResponse
 from .empty_response import EmptyResponse
 from .error_response import ErrorResponse
-from .mcast_parsable import MCastParsable
-from .mcast_request import MCastRequest
-from .mcast_request_series import MCastRequestSeries
-from .mcast_response import MCastResponse
-from .mcast_response_series import MCastResponseSeries
+from .mct_parsable import MCTParsable
+from .mct_request import MCTRequest
+from .mct_request_series import MCTRequestSeries
+from .mct_response import MCTResponse
+from .mct_response_series import MCTResponseSeries

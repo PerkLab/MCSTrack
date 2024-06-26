@@ -1,3 +1,2 @@
-from .component_error import ComponentError
-from .mcast_error import MCastError
-from .parsing_error import ParsingError
+from .mct_error import MCTError
+from .mct_parsing_error import MCTParsingError

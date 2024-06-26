@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import CaptureFormat
 from pydantic import Field
 
 
-class AddCalibrationImageRequest(MCastRequest):
+class AddCalibrationImageRequest(MCTRequest):
     """
     Calibrator will infer resolution from the image itself, and associate its own label to the data.
     """

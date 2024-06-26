@@ -1,8 +1,8 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from pydantic import Field
 
 
-class AddCalibrationImageResponse(MCastResponse):
+class AddCalibrationImageResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "add_calibration_image"

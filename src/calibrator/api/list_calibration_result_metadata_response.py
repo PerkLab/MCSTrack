@@ -1,9 +1,9 @@
 from ..structures import CalibrationResultMetadata
-from src.common import MCastResponse
+from src.common import MCTResponse
 from pydantic import Field
 
 
-class ListCalibrationResultMetadataResponse(MCastResponse):
+class ListCalibrationResultMetadataResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_calibration_result_metadata_list"

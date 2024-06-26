@@ -1,8 +1,8 @@
-from .mcast_response import MCastResponse
+from .mct_response import MCTResponse
 from pydantic import Field
 
 
-class EmptyResponse(MCastResponse):
+class EmptyResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "empty"

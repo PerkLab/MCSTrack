@@ -4,12 +4,12 @@ from src.common.api import \
     DequeueStatusMessagesRequest, \
     DequeueStatusMessagesResponse, \
     ErrorResponse, \
-    MCastParsable, \
-    MCastRequest, \
-    MCastRequestSeries, \
-    MCastResponse, \
-    MCastResponseSeries
-from src.common.exceptions import ParsingError
+    MCTParsable, \
+    MCTRequest, \
+    MCTRequestSeries, \
+    MCTResponse, \
+    MCTResponseSeries
+from src.common.exceptions import MCTParsingError
 from src.common.structures import \
     SeverityLabel, \
     StatusMessage
@@ -17,17 +17,15 @@ import abc
 import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
-from pydantic import BaseModel, ValidationError
 from typing import Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
 
-ParsableDynamicSingle = TypeVar('ParsableDynamicSingle', bound=MCastParsable)
-ParsableDynamicSeries = TypeVar('ParsableDynamicSeries', bound=BaseModel)
+ParsableDynamicSingle = TypeVar('ParsableDynamicSingle', bound=MCTParsable)
 
 
-class MCastComponent(abc.ABC):
+class MCTComponent(abc.ABC):
 
     _status_message_source: StatusMessageSource
 
@@ -64,53 +62,15 @@ class MCastComponent(abc.ABC):
         parsable_series_dict: dict,
         supported_types: list[type[ParsableDynamicSingle]]
     ) -> list[ParsableDynamicSingle]:
-        if "series" not in parsable_series_dict or not isinstance(parsable_series_dict["series"], list):
-            message: str = "parsable_series_dict did not contain field series. Input is improperly formatted."
+        try:
+            return MCTParsable.parse_dynamic_series_list(
+                parsable_series_dict=parsable_series_dict,
+                supported_types=supported_types)
+        except MCTParsingError as e:
             self.add_status_message(
                 severity="error",
-                message=message)
-            raise ParsingError(message)
-
-        output_series: list[ParsableDynamicSingle] = list()
-        for parsable_dict in parsable_series_dict["series"]:
-            if not isinstance(parsable_dict, dict):
-                message: str = "series contained a non-dict element. Input is improperly formatted."
-                self.add_status_message(
-                    severity="error",
-                    message=message)
-                raise ParsingError(message)
-            output_series.append(self.parse_dynamic_single(
-                parsable_dict=parsable_dict,
-                supported_types=supported_types))
-
-        return output_series
-
-    def parse_dynamic_single(
-        self,
-        parsable_dict: dict,
-        supported_types: list[type[ParsableDynamicSingle]]
-    ) -> ParsableDynamicSingle:
-        if "parsable_type" not in parsable_dict or not isinstance(parsable_dict["parsable_type"], str):
-            message: str = "parsable_dict did not contain parsable_type. Input is improperly formatted."
-            self.add_status_message(
-                severity="error",
-                message=message)
-            raise ParsingError(message) from None
-
-        for supported_type in supported_types:
-            if parsable_dict["parsable_type"] == supported_type.parsable_type_identifier():
-                request: ParsableDynamicSingle
-                try:
-                    request = supported_type(**parsable_dict)
-                except ValidationError as e:
-                    raise ParsingError(f"A request of type {supported_type} was ill-formed: {str(e)}") from None
-                return request
-
-        message: str = "parsable_type did not match any expected value. Input is improperly formatted."
-        self.add_status_message(
-            severity="error",
-            message=message)
-        raise ParsingError(message)
+                message=e.message)
+            raise e
 
     def dequeue_status_messages(self, **kwargs) -> DequeueStatusMessagesResponse:
         """
@@ -126,14 +86,14 @@ class MCastComponent(abc.ABC):
             status_messages=status_messages)
 
     @abc.abstractmethod
-    def supported_request_types(self) -> dict[type[MCastRequest], Callable[[dict], MCastResponse]]:
+    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
         """
         All subclasses are expected to implement this method, even if it is simply a call to super().
         :return:
             A mapping between request type and the function that is meant to handle it.
             The function shall generally accept a kwargs dict, and the kwargs dict may contain:
             - client_identifier: str unique to the component making the request
-            - request: Of type derived from MCastRequest that contains information specific to the request
+            - request: Of type derived from MCTRequest that contains information specific to the request
         """
         return {DequeueStatusMessagesRequest: self.dequeue_status_messages}
 
@@ -142,21 +102,21 @@ class MCastComponent(abc.ABC):
         try:
             client_identifier: str = f"{websocket.client.host}:{websocket.client.port}"
             self.add_status_subscriber(client_identifier=client_identifier)
-            request_series: MCastRequestSeries
-            response_series: MCastResponseSeries
+            request_series: MCTRequestSeries
+            response_series: MCTResponseSeries
             while True:
                 request_series_dict = await websocket.receive_json()
                 try:
-                    request_series_list: list[MCastRequest] = self.parse_dynamic_series_list(
+                    request_series_list: list[MCTRequest] = self.parse_dynamic_series_list(
                         parsable_series_dict=request_series_dict,
                         supported_types=list(self.supported_request_types().keys()))
-                except ParsingError as e:
+                except MCTParsingError as e:
                     logger.exception(str(e))
-                    await websocket.send_json(MCastResponseSeries(requests_parsed=False).dict())
+                    await websocket.send_json(MCTResponseSeries(requests_parsed=False).dict())
                     continue
-                response_series: MCastResponseSeries = self.websocket_handle_requests(
+                response_series: MCTResponseSeries = self.websocket_handle_requests(
                     client_identifier=client_identifier,
-                    request_series=MCastRequestSeries(series=request_series_list))
+                    request_series=MCTRequestSeries(series=request_series_list))
                 await websocket.send_json(response_series.dict())
         except WebSocketDisconnect as e:
             print(f"DISCONNECTED: {str(e)}")
@@ -165,16 +125,16 @@ class MCastComponent(abc.ABC):
     def websocket_handle_requests(
         self,
         client_identifier: str,
-        request_series: MCastRequestSeries
-    ) -> MCastResponseSeries:
-        request_map: dict[type[MCastRequest], Callable] = self.supported_request_types()
-        response_series: list[MCastResponse] = list()
+        request_series: MCTRequestSeries
+    ) -> MCTResponseSeries:
+        request_map: dict[type[MCTRequest], Callable] = self.supported_request_types()
+        response_series: list[MCTResponse] = list()
         for request in request_series.series:
             # noinspection PyBroadException
             try:
                 if type(request) in request_map:
-                    response_function: Callable[[dict], MCastResponse] = request_map[type(request)]
-                    response: MCastResponse = response_function(
+                    response_function: Callable[[dict], MCTResponse] = request_map[type(request)]
+                    response: MCTResponse = response_function(
                         client_identifier=client_identifier,
                         request=request)
                     response_series.append(response)
@@ -188,6 +148,6 @@ class MCastComponent(abc.ABC):
                 logger.error(message + " " + str(e))
                 self.add_status_message(severity="error", message=message)
                 response_series.append(ErrorResponse(message=message))
-        return MCastResponseSeries(
+        return MCTResponseSeries(
             requests_parsed=True,
             series=response_series)

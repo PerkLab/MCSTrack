@@ -6,16 +6,13 @@ from src.detector import \
     Detector, \
     DetectorConfiguration
 from src.detector.api import \
-    GetCaptureDeviceResponse, \
     GetCaptureImageRequest, \
     GetCaptureImageResponse, \
     GetCapturePropertiesResponse, \
     GetDetectionParametersResponse, \
     GetMarkerSnapshotsRequest, \
     GetMarkerSnapshotsResponse, \
-    SetCaptureDeviceRequest, \
     SetDetectionParametersRequest
-from src.calibrator import Calibrator
 from src.calibrator.fileio import CalibratorConfiguration
 from src.detector.fileio.detector_configuration import OPENCV, PICAMERA
 from src.detector.implementations import \
@@ -80,11 +77,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"])
 
-    @detector_app.get("/get_capture_device")
-    async def get_capture_device() -> GetCaptureDeviceResponse:
-        result: GetCaptureDeviceResponse = detector.get_capture_device()
-        return result
-
     @detector_app.get("/get_capture_image")
     async def get_capture_image() -> GetCaptureImageResponse:
         result: GetCaptureImageResponse = detector.get_capture_image(
@@ -108,13 +100,6 @@ def create_app() -> FastAPI:
         request: GetMarkerSnapshotsRequest
     ) -> GetMarkerSnapshotsResponse:
         return detector.get_marker_snapshots(
-            request=request)
-
-    @detector_app.post("/set_capture_device")
-    async def set_capture_device(
-        request: SetCaptureDeviceRequest
-    ) -> EmptyResponse | ErrorResponse:
-        return detector.set_capture_device(
             request=request)
 
     @detector_app.post("/set_detection_parameters")

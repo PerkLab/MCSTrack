@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import ImageResolution
 from pydantic import Field
 
 
-class CalibrateRequest(MCastRequest):
+class CalibrateRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "calibrate"

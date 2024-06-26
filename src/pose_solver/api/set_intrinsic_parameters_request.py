@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import IntrinsicParameters
 from pydantic import Field
 
 
-class SetIntrinsicParametersRequest(MCastRequest):
+class SetIntrinsicParametersRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "set_intrinsic_parameters"

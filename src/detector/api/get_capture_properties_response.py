@@ -1,8 +1,8 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from pydantic import Field
 
 
-class GetCapturePropertiesResponse(MCastResponse):
+class GetCapturePropertiesResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_capture_properties"

@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import MarkerSnapshot
 from pydantic import Field
 
 
-class AddMarkerCornersRequest(MCastRequest):
+class AddMarkerCornersRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "add_marker_corners"

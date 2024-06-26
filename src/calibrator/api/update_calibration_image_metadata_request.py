@@ -1,9 +1,9 @@
 from ..structures import CalibrationImageState
-from src.common import MCastRequest
+from src.common import MCTRequest
 from pydantic import Field
 
 
-class UpdateCalibrationImageMetadataRequest(MCastRequest):
+class UpdateCalibrationImageMetadataRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "update_calibration_image_metadata"

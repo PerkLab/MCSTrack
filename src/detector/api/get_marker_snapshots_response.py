@@ -1,9 +1,9 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from src.common.structures import MarkerSnapshot
 from pydantic import Field
 
 
-class GetMarkerSnapshotsResponse(MCastResponse):
+class GetMarkerSnapshotsResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_marker_snapshots"

@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import CaptureFormat
 from pydantic import Field
 
 
-class GetCaptureImageRequest(MCastRequest):
+class GetCaptureImageRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_capture_image"

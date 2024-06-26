@@ -1,8 +1,8 @@
-from .mcast_request import MCastRequest
+from .mct_request import MCTRequest
 from pydantic import Field
 
 
-class DequeueStatusMessagesRequest(MCastRequest):
+class DequeueStatusMessagesRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "dequeue_status_messages"

@@ -1,9 +1,9 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from src.common.structures import DetectorResolution
 from pydantic import Field
 
 
-class ListCalibrationDetectorResolutionsResponse(MCastResponse):
+class ListCalibrationDetectorResolutionsResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "list_calibration_detector_resolutions"

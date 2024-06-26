@@ -18,9 +18,9 @@ from src.common import \
     EmptyResponse, \
     ErrorResponse, \
     get_kwarg, \
-    MCastComponent, \
-    MCastRequest, \
-    MCastResponse
+    MCTComponent, \
+    MCTRequest, \
+    MCTResponse
 from src.common.structures import \
     Pose, \
     PoseSolverStatus
@@ -31,11 +31,11 @@ from typing import Callable
 logger = logging.getLogger(__name__)
 
 
-def dummy_function(_: dict) -> MCastResponse:
+def dummy_function(_: dict) -> MCTResponse:
     return EmptyResponse()
 
 
-class PoseSolverAPI(MCastComponent):
+class PoseSolverAPI(MCTComponent):
     """
     API-friendly layer overtop of a PoseSolver
     """
@@ -57,8 +57,8 @@ class PoseSolverAPI(MCastComponent):
         if self._status.solve_status == PoseSolverStatus.Solve.RUNNING:
             self._pose_solver.update()
 
-    def supported_request_types(self) -> dict[type[MCastRequest], Callable[[dict], MCastResponse]]:
-        return_value: dict[type[MCastRequest], Callable[[dict], MCastResponse]] = super().supported_request_types()
+    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
+        return_value: dict[type[MCTRequest], Callable[[dict], MCTResponse]] = super().supported_request_types()
         return_value.update({
             AddMarkerCornersRequest: self.add_marker_corners,
             AddTargetMarkerRequest: self.add_target_marker,

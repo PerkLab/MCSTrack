@@ -1,5 +1,4 @@
 from src.detector.api import \
-    GetCaptureDeviceResponse, \
     GetCapturePropertiesResponse, \
     SetCapturePropertiesRequest
 from src.detector.exceptions import UpdateCaptureError
@@ -7,7 +6,7 @@ from src.common import \
     EmptyResponse, \
     ErrorResponse, \
     get_kwarg, \
-    MCastResponse
+    MCTResponse
 from src.common.structures.capture_status import CaptureStatus
 
 from src.detector.implementations import AbstractCameraInterface
@@ -71,9 +70,6 @@ class PiCamera(AbstractCameraInterface):
 
         self._captured_timestamp_utc = datetime.datetime.utcnow()
 
-    def set_capture_device(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        return EmptyResponse()
-
     # noinspection DuplicatedCode
     def set_capture_properties(self, **kwargs) -> EmptyResponse:
         """
@@ -110,9 +106,6 @@ class PiCamera(AbstractCameraInterface):
             self._camera.start()
         return EmptyResponse()
 
-    def get_capture_device(self, **_kwargs) -> GetCaptureDeviceResponse:
-        return GetCaptureDeviceResponse(capture_device_id=str("N/A"))
-
     def get_capture_properties(self, **_kwargs) -> GetCapturePropertiesResponse | ErrorResponse:
         if self._captured_image is None:
             return ErrorResponse(
@@ -129,13 +122,13 @@ class PiCamera(AbstractCameraInterface):
                 sharpness=self._camera_controls.Sharpness)
             return ret
 
-    def start_capture(self, **kwargs) -> MCastResponse:
+    def start_capture(self, **kwargs) -> MCTResponse:
         self._camera.start()
         self._captured_image = self._camera.capture_array()
         self._capture_status.status = CaptureStatus.Status.RUNNING
         return EmptyResponse()
 
-    def stop_capture(self, **kwargs) -> MCastResponse:
+    def stop_capture(self, **kwargs) -> MCTResponse:
         if self._captured_image is not None:
             self._captured_image = None
         self._capture_status.status = CaptureStatus.Status.STOPPED

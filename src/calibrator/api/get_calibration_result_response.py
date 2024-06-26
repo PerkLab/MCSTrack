@@ -1,9 +1,9 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from src.common.structures import IntrinsicCalibration
 from pydantic import Field
 
 
-class GetCalibrationResultResponse(MCastResponse):
+class GetCalibrationResultResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_calibration_result"

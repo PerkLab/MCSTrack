@@ -1,8 +1,8 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from pydantic import Field
 
 
-class AddTargetMarkerResponse(MCastResponse):
+class AddTargetMarkerResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "add_marker_corners"

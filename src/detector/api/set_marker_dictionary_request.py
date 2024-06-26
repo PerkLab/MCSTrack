@@ -1,9 +1,9 @@
-from src.common import MCastRequest
+from src.common import MCTRequest
 from src.common.structures import MarkerDefinition
 from pydantic import Field
 
 
-class SetMarkerDictionaryRequest(MCastRequest):
+class SetMarkerDictionaryRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "set_marker_dictionary"

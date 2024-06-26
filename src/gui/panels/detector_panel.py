@@ -6,8 +6,7 @@ from .parameters import \
     ParameterCheckbox, \
     ParameterSelector, \
     ParameterSpinboxFloat, \
-    ParameterSpinboxInteger, \
-    ParameterText
+    ParameterSpinboxInteger
 from src.calibrator.api import \
     AddCalibrationImageRequest, \
     AddCalibrationImageResponse
@@ -16,21 +15,20 @@ from src.common import \
     EmptyResponse, \
     ImageCoding, \
     ImageUtils, \
-    MCastRequestSeries, \
-    MCastResponse, \
-    MCastResponseSeries, \
+    MCTRequestSeries, \
+    MCTResponse, \
+    MCTResponseSeries, \
     StandardResolutions, \
     StatusMessageSource
 from src.common.structures import \
     CaptureFormat, \
     DetectionParameters, \
+    DetectorFrame, \
     ImageResolution, \
     MarkerSnapshot
-from src.connector import \
-    Connector
+from src.controller import \
+    MCTController
 from src.detector.api import \
-    GetCaptureDeviceRequest, \
-    GetCaptureDeviceResponse, \
     GetCaptureImageRequest, \
     GetCaptureImageResponse, \
     GetCapturePropertiesRequest, \
@@ -39,11 +37,8 @@ from src.detector.api import \
     GetDetectionParametersResponse, \
     GetMarkerSnapshotsRequest, \
     GetMarkerSnapshotsResponse, \
-    SetCaptureDeviceRequest, \
     SetCapturePropertiesRequest, \
-    SetDetectionParametersRequest, \
-    StartCaptureRequest, \
-    StopCaptureRequest
+    SetDetectionParametersRequest
 import cv2
 from io import BytesIO
 import logging
@@ -74,21 +69,17 @@ _CAPTURE_FORMAT: CaptureFormat = ".jpg"
 
 class DetectorPanel(BasePanel):
 
-    _connector: Connector
-    _capture_start_request_id: uuid.UUID | None
-    _capture_stop_request_id: uuid.UUID | None
-    _capture_snapshot_request_id: uuid.UUID | None
-    _set_capture_parameters_request_id: uuid.UUID | None
-    _set_detection_parameters_request_id: uuid.UUID | None
+    _controller: MCTController
+
+    _control_blocking_request_id: uuid.UUID | None
+    _live_preview_request_id: uuid.UUID | None
 
     _live_image_base64: str | None
     _live_markers_detected: list[MarkerSnapshot]
     _live_markers_rejected: list[MarkerSnapshot]
 
     _detector_selector: ParameterSelector
-    _device_id_textbox: ParameterText
-    _capture_start_button: wx.Button
-    _capture_stop_button: wx.Button
+    _preview_image_checkbox: ParameterCheckbox
     _annotate_detected_checkbox: ParameterCheckbox
     _annotate_rejected_checkbox: ParameterCheckbox
     _send_capture_parameters_button: wx.Button
@@ -146,22 +137,18 @@ class DetectorPanel(BasePanel):
     def __init__(
         self,
         parent: wx.Window,
-        connector: Connector,
+        controller: MCTController,
         status_message_source: StatusMessageSource,
         name: str = "DetectorPanel"
     ):
         super().__init__(
             parent=parent,
-            connector=connector,
             status_message_source=status_message_source,
             name=name)
-        self._connector = connector
+        self._controller = controller
         self._capture_active = False
-        self._capture_start_request_id = None
-        self._capture_stop_request_id = None
-        self._capture_snapshot_request_id = None
-        self._set_capture_parameters_request_id = None
-        self._set_detection_parameters_request_id = None
+        self._live_preview_request_id = None
+        self._control_blocking_request_id = None
 
         self._live_image_base64 = None
         self._live_markers_detected = list()
@@ -201,21 +188,10 @@ class DetectorPanel(BasePanel):
             font_size_delta=2,
             bold=True)
 
-        self._device_id_textbox = self.add_control_text_input(
+        self._preview_image_checkbox = self.add_control_checkbox(
             parent=control_panel,
             sizer=control_sizer,
-            label="USB Device ID",
-            value="0")
-
-        self._capture_start_button: wx.Button = self.add_control_button(
-            parent=control_panel,
-            sizer=control_sizer,
-            label="Start Capture")
-
-        self._capture_stop_button: wx.Button = self.add_control_button(
-            parent=control_panel,
-            sizer=control_sizer,
-            label="Stop Capture")
+            label="Preview Image")
 
         self._annotate_detected_checkbox = self.add_control_checkbox(
             parent=control_panel,
@@ -654,12 +630,15 @@ class DetectorPanel(BasePanel):
         self._detector_selector.selector.Bind(
             event=wx.EVT_CHOICE,
             handler=self.on_detector_selected)
-        self._capture_start_button.Bind(
-            event=wx.EVT_BUTTON,
-            handler=self.on_capture_start_pressed)
-        self._capture_stop_button.Bind(
-            event=wx.EVT_BUTTON,
-            handler=self.on_capture_stop_pressed)
+        self._preview_image_checkbox.checkbox.Bind(
+            event=wx.EVT_CHECKBOX,
+            handler=self.on_display_mode_changed)
+        self._annotate_detected_checkbox.checkbox.Bind(
+            event=wx.EVT_CHECKBOX,
+            handler=self.on_display_mode_changed)
+        self._annotate_rejected_checkbox.checkbox.Bind(
+            event=wx.EVT_CHECKBOX,
+            handler=self.on_display_mode_changed)
         self._send_capture_parameters_button.Bind(
             event=wx.EVT_BUTTON,
             handler=self.on_send_capture_parameters_pressed)
@@ -670,8 +649,7 @@ class DetectorPanel(BasePanel):
             event=wx.EVT_BUTTON,
             handler=self.on_calibration_capture_pressed)
 
-        self.disable_detector_controls()
-        self.disable_parameter_controls()
+        self._update_ui_controls()
 
     def begin_capture_calibration(self) -> None:
         # TODO: THIS NEEDS TO BE IN LOSSLESS (.PNG) FORMAT!!!
@@ -681,62 +659,37 @@ class DetectorPanel(BasePanel):
                 severity="error",
                 message=f"Requested to add a calibration image but there is no live image. Returning.")
             return
-        request_series: MCastRequestSeries = MCastRequestSeries(
+        request_series: MCTRequestSeries = MCTRequestSeries(
             series=[
                 AddCalibrationImageRequest(
                     detector_serial_identifier=selected_detector_label,
                     format=_CAPTURE_FORMAT,
                     image_base64=self._live_image_base64)])
-        self._connector.request_series_push(
+        self._live_preview_request_id = self._controller.request_series_push(
             connection_label=selected_detector_label,
             request_series=request_series)
+        self._update_ui_controls()
 
     def begin_capture_snapshot(self):
         selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
-        request_series: MCastRequestSeries = MCastRequestSeries(
+        request_series: MCTRequestSeries = MCTRequestSeries(
             series=[
                 GetCaptureImageRequest(
                     format=_CAPTURE_FORMAT),
                 GetMarkerSnapshotsRequest(
                     detected_marker_snapshots=True,
                     rejected_marker_snapshots=True)])
-        self._capture_snapshot_request_id = self._connector.request_series_push(
+        self._live_preview_request_id = self._controller.request_series_push(
             connection_label=selected_detector_label,
             request_series=request_series)
-
-    def begin_capture_start(self):
-        selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
-        request_series: MCastRequestSeries = MCastRequestSeries(
-            series=[
-                SetCaptureDeviceRequest(
-                    capture_device_id=self._device_id_textbox.textbox.GetValue()),
-                GetCaptureDeviceRequest(),  # sync
-                StartCaptureRequest(),
-                GetCapturePropertiesRequest()])
-        self._capture_start_request_id = self._connector.request_series_push(
-            connection_label=selected_detector_label,
-            request_series=request_series)
-        self.disable_detector_controls()
-        self.disable_parameter_controls()
-
-    def begin_capture_stop(self):
-        selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
-        request_series: MCastRequestSeries = MCastRequestSeries(
-            series=[StopCaptureRequest()])
-        self._capture_stop_request_id = self._connector.request_series_push(
-            connection_label=selected_detector_label,
-            request_series=request_series)
-        self.disable_detector_controls()
-        self.disable_parameter_controls()
 
     def begin_set_capture_parameters(self):
         selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
         resolution_str: str = self._capture_param_resolution.selector.GetStringSelection()
         image_resolution = ImageResolution.from_str(in_str=resolution_str)
-        request_series: MCastRequestSeries = MCastRequestSeries(
+        request_series: MCTRequestSeries = MCTRequestSeries(
             series=[
                 SetCapturePropertiesRequest(
-                    usb_device_id=self._device_id_textbox.textbox.GetValue(),
                     resolution_x_px=image_resolution.x_px,
                     resolution_y_px=image_resolution.y_px,
                     fps=int(self._capture_param_fps.selector.GetStringSelection()),
@@ -747,11 +700,10 @@ class DetectorPanel(BasePanel):
                     sharpness=self._capture_param_sharpness.spinbox.GetValue(),
                     gamma=self._capture_param_gamma.spinbox.GetValue()),
                 GetCapturePropertiesRequest()])  # sync
-        self._set_capture_parameters_request_id = self._connector.request_series_push(
+        self._control_blocking_request_id = self._controller.request_series_push(
             connection_label=selected_detector_label,
             request_series=request_series)
-        self.disable_detector_controls()
-        self.disable_parameter_controls()
+        self._update_ui_controls()
 
     def begin_set_detection_parameters(self):
         selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
@@ -788,240 +740,21 @@ class DetectorPanel(BasePanel):
             use_aruco_3_detection=self._detection_param_use_aruco_3_detection.checkbox.GetValue(),
             min_marker_length_ratio_original_img=self._detection_param_min_marker_length_ratio_orig.spinbox.GetValue(),
             min_side_length_canonical_img=self._detection_param_min_side_length_canonical_img.spinbox.GetValue())
-        request_series: MCastRequestSeries = MCastRequestSeries(series=[
+        request_series: MCTRequestSeries = MCTRequestSeries(series=[
             SetDetectionParametersRequest(parameters=params),
             GetDetectionParametersRequest()])  # sync
-        self._set_detection_parameters_request_id = self._connector.request_series_push(
+        self._control_blocking_request_id = self._controller.request_series_push(
             connection_label=selected_detector_label,
             request_series=request_series)
-        self.disable_detector_controls()
-        self.disable_parameter_controls()
-
-    def disable_detector_controls(self):
-        self.set_detector_controls_enabled(enable=False)
-
-    def disable_parameter_controls(self):
-        self.set_parameter_controls_enabled(enable=False)
-
-    def enable_detector_controls(self):
-        self.set_detector_controls_enabled(enable=True)
-
-    def enable_parameter_controls(self):
-        self.set_parameter_controls_enabled(enable=True)
-
-    def on_calibration_capture_pressed(self, _event: wx.CommandEvent):
-        self.begin_capture_calibration()
-
-    def on_capture_start_pressed(self, _event: wx.CommandEvent):
-        self.begin_capture_start()
-
-    def on_capture_stop_pressed(self, _event: wx.CommandEvent):
-        self.begin_capture_stop()
-
-    def on_detector_selected(self, _event: wx.CommandEvent):
-        self.enable_detector_controls()
-
-    def on_send_capture_parameters_pressed(self, _event: wx.CommandEvent):
-        self.begin_set_capture_parameters()
-
-    def on_send_detection_parameters_pressed(self, _event: wx.CommandEvent):
-        self.begin_set_detection_parameters()
-
-    def on_page_select(self):
-        super().on_page_select()
-        available_detector_labels: list[str] = self._connector.get_connected_detector_labels()
-        self._detector_selector.set_options(option_list=available_detector_labels)
-
-    def on_page_deselect(self):
-        super().on_page_deselect()
-        self.disable_parameter_controls()
-        self.disable_detector_controls()
-
-        # TODO: Send stop command if camera is still going
-
-    # noinspection DuplicatedCode
-    def set_detector_controls_enabled(
-        self,
-        enable: bool
-    ):
-        self._device_id_textbox.set_enabled(enable=enable)
-        self._capture_start_button.Enable(enable=enable)
-        self._capture_stop_button.Enable(enable=enable)
-        self._annotate_detected_checkbox.Enable(enable=enable)
-        self._annotate_rejected_checkbox.Enable(enable=enable)
-        self._calibration_capture_button.Enable(enable=enable)
-
-    # noinspection DuplicatedCode
-    def set_parameter_controls_enabled(
-        self,
-        enable: bool
-    ):
-        self._capture_param_resolution.set_enabled(enable=enable)
-        self._capture_param_fps.set_enabled(enable=enable)
-        self._capture_param_auto_exposure.set_enabled(enable=enable)
-        self._capture_param_exposure.set_enabled(enable=enable)
-        self._capture_param_brightness.set_enabled(enable=enable)
-        self._capture_param_contrast.set_enabled(enable=enable)
-        self._capture_param_sharpness.set_enabled(enable=enable)
-        self._capture_param_gamma.set_enabled(enable=enable)
-        self._detection_param_adaptive_thresh_win_size_min.set_enabled(enable=enable)
-        self._detection_param_adaptive_thresh_win_size_max.set_enabled(enable=enable)
-        self._detection_param_adaptive_thresh_win_size_step.set_enabled(enable=enable)
-        self._detection_param_adaptive_thresh_constant.set_enabled(enable=enable)
-        self._detection_param_min_marker_perimeter_rate.set_enabled(enable=enable)
-        self._detection_param_max_marker_perimeter_rate.set_enabled(enable=enable)
-        self._detection_param_polygonal_approx_accuracy_rate.set_enabled(enable=enable)
-        self._detection_param_min_corner_distance_rate.set_enabled(enable=enable)
-        self._detection_param_min_marker_distance_rate.set_enabled(enable=enable)
-        self._detection_param_min_distance_to_border.set_enabled(enable=enable)
-        self._detection_param_marker_border_bits.set_enabled(enable=enable)
-        self._detection_param_min_otsu_std_dev.set_enabled(enable=enable)
-        self._detection_param_persp_rem_px_per_cell.set_enabled(enable=enable)
-        self._detection_param_persp_rem_marg_per_cell.set_enabled(enable=enable)
-        self._detection_param_max_erroneous_bits_border_rate.set_enabled(enable=enable)
-        self._detection_param_error_correction_rate.set_enabled(enable=enable)
-        self._detection_param_detect_inverted_marker.set_enabled(enable=enable)
-        self._detection_param_corner_refinement_method.set_enabled(enable=enable)
-        self._detection_param_corner_refinement_win_size.set_enabled(enable=enable)
-        self._detection_param_corner_refinement_max_iterations.set_enabled(enable=enable)
-        self._detection_param_corner_refinement_min_accuracy.set_enabled(enable=enable)
-        self._detection_param_april_tag_critical_rad.set_enabled(enable=enable)
-        self._detection_param_april_tag_deglitch.set_enabled(enable=enable)
-        self._detection_param_april_tag_max_line_fit_mse.set_enabled(enable=enable)
-        self._detection_param_april_tag_max_nmaxima.set_enabled(enable=enable)
-        self._detection_param_april_tag_min_cluster_pixels.set_enabled(enable=enable)
-        self._detection_param_april_tag_min_white_black_diff.set_enabled(enable=enable)
-        self._detection_param_april_tag_quad_decimate.set_enabled(enable=enable)
-        self._detection_param_april_tag_quad_sigma.set_enabled(enable=enable)
-        self._detection_param_use_aruco_3_detection.set_enabled(enable=enable)
-        self._detection_param_min_side_length_canonical_img.set_enabled(enable=enable)
-        self._detection_param_min_marker_length_ratio_orig.set_enabled(enable=enable)
-        self._send_capture_parameters_button.Enable(enable=enable)
-        self._send_detection_parameters_button.Enable(enable=enable)
-
-    def update_loop(self):
-        super().update_loop()
-        success: bool
-        if self._capture_start_request_id is not None:
-            success, self._capture_start_request_id = self.update_request(
-                request_id=self._capture_start_request_id,
-                task_description="capture start",
-                expected_response_count=4)
-            if not self._capture_stop_request_id:
-                self.enable_detector_controls()
-                if success:
-                    self.enable_parameter_controls()
-                    self.begin_capture_snapshot()
-        elif self._capture_stop_request_id is not None:
-            success, self._capture_stop_request_id = self.update_request(
-                request_id=self._capture_stop_request_id,
-                task_description="capture stop",
-                expected_response_count=1)
-            if not self._capture_stop_request_id:
-                self.enable_detector_controls()
-        elif self._set_capture_parameters_request_id is not None:
-            success, self._set_capture_parameters_request_id = self.update_request(
-                request_id=self._set_capture_parameters_request_id,
-                task_description="set capture parameters",
-                expected_response_count=2)
-            if not self._capture_stop_request_id and not self._set_detection_parameters_request_id:
-                self.enable_detector_controls()
-                if success:
-                    self.enable_parameter_controls()
-        elif self._set_detection_parameters_request_id is not None:
-            success, self._set_detection_parameters_request_id = self.update_request(
-                request_id=self._set_detection_parameters_request_id,
-                task_description="set detection parameters",
-                expected_response_count=2)
-            if not self._capture_stop_request_id and not self._set_capture_parameters_request_id:
-                self.enable_detector_controls()
-                if success:
-                    self.enable_parameter_controls()
-        elif self._capture_snapshot_request_id is not None:
-            success, self._capture_snapshot_request_id = self.update_request(
-                request_id=self._capture_snapshot_request_id,
-                task_description="image update",
-                expected_response_count=2)
-            if not self._capture_snapshot_request_id:
-                self.begin_capture_snapshot()
-                if success:
-                    self.update_image()
-
-    def update_request(
-        self,
-        request_id: uuid.UUID,
-        task_description: str,
-        expected_response_count: Optional[int] = None
-    ) -> (bool, uuid.UUID | None):
-        """
-        Returns a tuple of:
-        - success at handling the response (False if no response has been received)
-        - value that request_id shall take for subsequent iterations
-        """
-
-        response_series: MCastResponseSeries | None = self._connector.response_series_pop(
-            request_series_id=request_id)
-        if response_series is None:
-            return False, request_id  # try again next loop
-
-        self.enable_detector_controls()
-
-        success: bool = self.handle_response_series(
-            response_series=response_series,
-            task_description=task_description,
-            expected_response_count=expected_response_count)
-        return success, None  # We've handled the request, request_id can be set to None
-
-    def update_image(self):
-        opencv_image: numpy.ndarray = ImageCoding.base64_to_image(input_base64=self._live_image_base64)
-        resized_opencv_image: numpy.ndarray = ImageUtils.image_resize_to_fit(
-            opencv_image=opencv_image,
-            available_size=self._image_panel.GetSize())
-        scale: float = resized_opencv_image.shape[0] / opencv_image.shape[0]
-
-        if self._annotate_detected_checkbox.checkbox.GetValue():
-            corners: numpy.ndarray = self._marker_snapshot_list_to_opencv_points(
-                marker_snapshot_list=self._live_markers_detected,
-                scale=scale)
-            cv2.polylines(
-                img=resized_opencv_image,
-                pts=corners,
-                isClosed=True,
-                color=[255, 191, 127],  # blue
-                thickness=2)
-
-        if self._annotate_rejected_checkbox.checkbox.GetValue():
-            corners: numpy.ndarray = self._marker_snapshot_list_to_opencv_points(
-                marker_snapshot_list=self._live_markers_rejected,
-                scale=scale)
-            cv2.polylines(
-                img=resized_opencv_image,
-                pts=corners,
-                isClosed=True,
-                color=[127, 191, 255],  # orange
-                thickness=2)
-
-        image_buffer: bytes = ImageCoding.image_to_bytes(image_data=resized_opencv_image, image_format=".jpg")
-        image_buffer_io: BytesIO = BytesIO(image_buffer)
-        wx_image: wx.Image = wx.Image(image_buffer_io)
-        wx_bitmap: wx.Bitmap = wx_image.ConvertToBitmap()
-        self._image_panel.set_bitmap(wx_bitmap)
-        self._image_panel.paint()
+        self._update_ui_controls()
 
     def handle_response_series(
         self,
-        response_series: MCastResponseSeries,
+        response_series: MCTResponseSeries,
         task_description: Optional[str] = None,
         expected_response_count: Optional[int] = None
-    ) -> bool:  # return False if errors occurred
-        success: bool = super().handle_response_series(
-            response_series=response_series,
-            task_description=task_description,
-            expected_response_count=expected_response_count)
-        if not success:
-            return False
-
-        response: MCastResponse
+    ) -> None:
+        response: MCTResponse
         for response in response_series.series:
             if isinstance(response, AddCalibrationImageResponse):
                 self._handle_add_calibration_image_response(response=response)
@@ -1029,19 +762,14 @@ class DetectorPanel(BasePanel):
                 self._handle_get_capture_parameters_response(response=response)
             elif isinstance(response, GetDetectionParametersResponse):
                 self._handle_get_detection_parameters_response(response=response)
-            elif isinstance(response, GetCaptureDeviceResponse):
-                self._handle_get_device_response(response=response)
             elif isinstance(response, GetCaptureImageResponse):
                 self._handle_capture_snapshot_response(response=response)
             elif isinstance(response, GetMarkerSnapshotsResponse):
                 self._handle_marker_snapshot_response(response=response)
             elif isinstance(response, ErrorResponse):
                 self.handle_error_response(response=response)
-                success = False
             elif not isinstance(response, EmptyResponse):
                 self.handle_unknown_response(response=response)
-                success = False
-        return success
 
     def _handle_add_calibration_image_response(
         self,
@@ -1055,13 +783,8 @@ class DetectorPanel(BasePanel):
         self,
         response: GetCaptureImageResponse
     ):
-        self._live_image_base64 = response.image_base64
-
-    def _handle_get_device_response(
-        self,
-        response: GetCaptureDeviceResponse
-    ):
-        self._device_id_textbox.textbox.SetValue(response.capture_device_id)
+        if self._preview_image_checkbox.checkbox.GetValue():
+            self._live_image_base64 = response.image_base64
 
     # noinspection DuplicatedCode
     def _handle_get_capture_parameters_response(
@@ -1191,3 +914,179 @@ class DetectorPanel(BasePanel):
         ]] for marker in marker_snapshot_list]
         return_value = numpy.array(corners, dtype=numpy.int32)
         return return_value
+
+    def on_calibration_capture_pressed(self, _event: wx.CommandEvent):
+        self.begin_capture_calibration()
+
+    def on_detector_selected(self, _event: wx.CommandEvent):
+        self._live_image_base64 = None
+        self._update_ui_image()
+        self._update_ui_controls()
+
+    def on_display_mode_changed(self, _event: wx.CommandEvent):
+        if not self._preview_image_checkbox.checkbox.GetValue():
+            self._live_image_base64 = None
+        self._update_ui_image()
+
+    def on_page_select(self):
+        super().on_page_select()
+        available_detector_labels: list[str] = self._controller.get_active_detector_labels()
+        self._detector_selector.set_options(option_list=available_detector_labels)
+        self._update_ui_controls()
+
+    def on_send_capture_parameters_pressed(self, _event: wx.CommandEvent):
+        self.begin_set_capture_parameters()
+
+    def on_send_detection_parameters_pressed(self, _event: wx.CommandEvent):
+        self.begin_set_detection_parameters()
+
+    def _set_display_controls_enabled(
+        self,
+        enable: bool
+    ):
+        self._preview_image_checkbox.Enable(enable=enable)
+        self._annotate_detected_checkbox.Enable(enable=enable)
+        self._annotate_rejected_checkbox.Enable(enable=enable)
+
+    def _set_parameter_controls_enabled(
+        self,
+        enable: bool
+    ):
+        self._capture_param_resolution.set_enabled(enable=enable)
+        self._capture_param_fps.set_enabled(enable=enable)
+        self._capture_param_auto_exposure.set_enabled(enable=enable)
+        self._capture_param_exposure.set_enabled(enable=enable)
+        self._capture_param_brightness.set_enabled(enable=enable)
+        self._capture_param_contrast.set_enabled(enable=enable)
+        self._capture_param_sharpness.set_enabled(enable=enable)
+        self._capture_param_gamma.set_enabled(enable=enable)
+        self._detection_param_adaptive_thresh_win_size_min.set_enabled(enable=enable)
+        self._detection_param_adaptive_thresh_win_size_max.set_enabled(enable=enable)
+        self._detection_param_adaptive_thresh_win_size_step.set_enabled(enable=enable)
+        self._detection_param_adaptive_thresh_constant.set_enabled(enable=enable)
+        self._detection_param_min_marker_perimeter_rate.set_enabled(enable=enable)
+        self._detection_param_max_marker_perimeter_rate.set_enabled(enable=enable)
+        self._detection_param_polygonal_approx_accuracy_rate.set_enabled(enable=enable)
+        self._detection_param_min_corner_distance_rate.set_enabled(enable=enable)
+        self._detection_param_min_marker_distance_rate.set_enabled(enable=enable)
+        self._detection_param_min_distance_to_border.set_enabled(enable=enable)
+        self._detection_param_marker_border_bits.set_enabled(enable=enable)
+        self._detection_param_min_otsu_std_dev.set_enabled(enable=enable)
+        self._detection_param_persp_rem_px_per_cell.set_enabled(enable=enable)
+        self._detection_param_persp_rem_marg_per_cell.set_enabled(enable=enable)
+        self._detection_param_max_erroneous_bits_border_rate.set_enabled(enable=enable)
+        self._detection_param_error_correction_rate.set_enabled(enable=enable)
+        self._detection_param_detect_inverted_marker.set_enabled(enable=enable)
+        self._detection_param_corner_refinement_method.set_enabled(enable=enable)
+        self._detection_param_corner_refinement_win_size.set_enabled(enable=enable)
+        self._detection_param_corner_refinement_max_iterations.set_enabled(enable=enable)
+        self._detection_param_corner_refinement_min_accuracy.set_enabled(enable=enable)
+        self._detection_param_april_tag_critical_rad.set_enabled(enable=enable)
+        self._detection_param_april_tag_deglitch.set_enabled(enable=enable)
+        self._detection_param_april_tag_max_line_fit_mse.set_enabled(enable=enable)
+        self._detection_param_april_tag_max_nmaxima.set_enabled(enable=enable)
+        self._detection_param_april_tag_min_cluster_pixels.set_enabled(enable=enable)
+        self._detection_param_april_tag_min_white_black_diff.set_enabled(enable=enable)
+        self._detection_param_april_tag_quad_decimate.set_enabled(enable=enable)
+        self._detection_param_april_tag_quad_sigma.set_enabled(enable=enable)
+        self._detection_param_use_aruco_3_detection.set_enabled(enable=enable)
+        self._detection_param_min_side_length_canonical_img.set_enabled(enable=enable)
+        self._detection_param_min_marker_length_ratio_orig.set_enabled(enable=enable)
+        self._send_capture_parameters_button.Enable(enable=enable)
+        self._send_detection_parameters_button.Enable(enable=enable)
+
+    def update_loop(self):
+        super().update_loop()
+
+        response_series: MCTResponseSeries | None
+        if self._control_blocking_request_id is not None:
+            self._control_blocking_request_id, response_series = self._controller.response_series_pop(
+                request_series_id=self._control_blocking_request_id)
+            if response_series is not None:  # self._control_blocking_request_id will be None
+                self.handle_response_series(response_series)
+                self._update_ui_controls()
+        elif self._live_preview_request_id is not None:
+            self._live_preview_request_id, response_series = self._controller.response_series_pop(
+                request_series_id=self._live_preview_request_id)
+            if response_series is not None:
+                self.handle_response_series(response_series)
+
+        detector_label: str = self._detector_selector.selector.GetStringSelection()
+        if detector_label is not None and len(detector_label) > 0:
+            if self._preview_image_checkbox.checkbox.GetValue() and self._live_preview_request_id is None:
+                self.begin_capture_snapshot()
+            detector_frame: DetectorFrame | None = self._controller.get_live_detector_frame(
+                detector_label=detector_label)
+            if detector_frame is not None:
+                self._live_markers_detected = detector_frame.detected_marker_snapshots
+                self._live_markers_rejected = detector_frame.rejected_marker_snapshots
+
+        if self._preview_image_checkbox.checkbox.GetValue() or \
+           self._annotate_detected_checkbox.checkbox.GetValue() or \
+           self._annotate_rejected_checkbox.checkbox.GetValue():
+            self._update_ui_image()
+
+    def _update_ui_controls(self):
+        self._set_display_controls_enabled(enable=False)
+        self._set_parameter_controls_enabled(enable=False)
+        self._calibration_capture_button.Enable(enable=False)
+        self._detector_selector.set_enabled(enable=True)
+        selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
+        if selected_detector_label is None or len(selected_detector_label) <= 0:
+            return
+        if self._control_blocking_request_id is not None:
+            return
+        self._set_display_controls_enabled(enable=True)
+        self._set_parameter_controls_enabled(enable=True)
+        self._calibration_capture_button.Enable(enable=True)
+
+    def _update_ui_image(self):
+        resolution_str: str = self._capture_param_resolution.selector.GetStringSelection()
+        display_image: numpy.ndarray
+        scale: float | None
+        if self._live_image_base64 is not None:
+            opencv_image: numpy.ndarray = ImageCoding.base64_to_image(input_base64=self._live_image_base64)
+            display_image: numpy.ndarray = ImageUtils.image_resize_to_fit(
+                opencv_image=opencv_image,
+                available_size=self._image_panel.GetSize())
+            scale: float = display_image.shape[0] / opencv_image.shape[0]  # note: opencv idx 0 corresponds to height
+        elif resolution_str is not None and len(resolution_str) > 0:
+            panel_size_px: tuple[int, int] = self._image_panel.GetSize()
+            image_resolution: ImageResolution = ImageResolution.from_str(in_str=resolution_str)
+            rescaled_resolution_px: tuple[int, int] = ImageUtils.scale_factor_for_available_space_px(
+                source_resolution_px=(image_resolution.x_px, image_resolution.y_px),
+                available_size_px=panel_size_px)
+            display_image = ImageUtils.black_image(resolution_px=rescaled_resolution_px)
+            scale: float = rescaled_resolution_px[1] / image_resolution.y_px
+        else:
+            display_image = ImageUtils.black_image(resolution_px=self._image_panel.GetSize())
+            scale = None  # not available
+
+        if scale is not None:
+            if self._annotate_detected_checkbox.checkbox.GetValue():
+                corners: numpy.ndarray = self._marker_snapshot_list_to_opencv_points(
+                    marker_snapshot_list=self._live_markers_detected,
+                    scale=scale)
+                cv2.polylines(
+                    img=display_image,
+                    pts=corners,
+                    isClosed=True,
+                    color=[255, 191, 127],  # blue
+                    thickness=2)
+            if self._annotate_rejected_checkbox.checkbox.GetValue():
+                corners: numpy.ndarray = self._marker_snapshot_list_to_opencv_points(
+                    marker_snapshot_list=self._live_markers_rejected,
+                    scale=scale)
+                cv2.polylines(
+                    img=display_image,
+                    pts=corners,
+                    isClosed=True,
+                    color=[127, 191, 255],  # orange
+                    thickness=2)
+
+        image_buffer: bytes = ImageCoding.image_to_bytes(image_data=display_image, image_format=".jpg")
+        image_buffer_io: BytesIO = BytesIO(image_buffer)
+        wx_image: wx.Image = wx.Image(image_buffer_io)
+        wx_bitmap: wx.Bitmap = wx_image.ConvertToBitmap()
+        self._image_panel.set_bitmap(wx_bitmap)
+        self._image_panel.paint()

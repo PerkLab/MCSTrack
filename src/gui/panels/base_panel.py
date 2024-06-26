@@ -6,14 +6,9 @@ from .parameters import \
     ParameterText
 from src.common import \
     ErrorResponse, \
-    MCastResponse, \
-    MCastResponseSeries, \
+    MCTResponse, \
     StatusMessageSource
-from src.connector import \
-    Connector
-from typing import Optional
 from typing import Final
-import uuid
 import wx
 
 
@@ -29,17 +24,13 @@ class BasePanel(wx.Panel):
 
     _update_loop_running: bool
 
-    _connector: Connector
-
     def __init__(
         self,
         parent: wx.Window,
-        connector: Connector,
         status_message_source: StatusMessageSource,
         name: str
     ):
         super().__init__(parent=parent, name=name)
-        self._connector = connector
         self.panel_is_selected = False
         self.status_message_source = status_message_source
 
@@ -54,34 +45,9 @@ class BasePanel(wx.Panel):
             severity="error",
             message=f"Received error: {response.message}")
 
-    def handle_response_series(
-        self,
-        response_series: MCastResponseSeries,
-        task_description: Optional[str] = None,
-        expected_response_count: Optional[int] = None
-    ) -> bool:  # return False if errors occurred
-        if expected_response_count is not None:
-            response_count: int = len(response_series.series)
-            task_text: str = str()
-            if task_description is not None:
-                task_text = f" during {task_description}"
-            if response_count < expected_response_count:
-                self.status_message_source.enqueue_status_message(
-                    severity="warning",
-                    message=f"Received a response series{task_text}, "
-                            f"but it contained fewer responses ({response_count}) "
-                            f"than expected ({expected_response_count}).")
-            elif response_count > expected_response_count:
-                self.status_message_source.enqueue_status_message(
-                    severity="warning",
-                    message=f"Received a response series{task_text}, "
-                            f"but it contained more responses ({response_count}) "
-                            f"than expected ({expected_response_count}).")
-        return True
-
     def handle_unknown_response(
         self,
-        response: MCastResponse
+        response: MCTResponse
     ):
         self.status_message_source.enqueue_status_message(
             severity="error",
@@ -106,34 +72,10 @@ class BasePanel(wx.Panel):
         """
         Overload for anything that should be updated approximately once per GUI frame
         """
-        self._connector.update_loop()
         if not self.panel_is_selected:
             self._update_loop_running = False
             return
         wx.CallLater(_UPDATE_INTERVAL_MILLISECONDS, self.update_loop)
-
-    def update_request(
-        self,
-        request_id: uuid.UUID,
-        task_description: Optional[str] = None,
-        expected_response_count: Optional[int] = None
-    ) -> (bool, uuid.UUID | None):
-        """
-        Returns a tuple of:
-        - success at handling the response (False if no response has been received)
-        - value that request_id shall take for subsequent iterations (None means a response series has been received)
-        """
-
-        response_series: MCastResponseSeries | None = self._connector.response_series_pop(
-            request_series_id=request_id)
-        if response_series is None:
-            return False, request_id  # try again next loop
-
-        success: bool = self.handle_response_series(
-            response_series=response_series,
-            task_description=task_description,
-            expected_response_count=expected_response_count)
-        return success, None  # We've handled the request, request_id can be set to None
 
     # -------------------------------------------------------------------------------------
 

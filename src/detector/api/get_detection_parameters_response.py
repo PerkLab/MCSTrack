@@ -1,9 +1,9 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from src.common.structures import DetectionParameters
 from pydantic import Field
 
 
-class GetDetectionParametersResponse(MCastResponse):
+class GetDetectionParametersResponse(MCTResponse):
     @staticmethod
     def parsable_type_identifier() -> str:
         return "get_detection_parameters"

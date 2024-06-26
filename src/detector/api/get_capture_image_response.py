@@ -1,9 +1,9 @@
-from src.common import MCastResponse
+from src.common import MCTResponse
 from src.common.structures import CaptureFormat
 from pydantic import Field
 
 
-class GetCaptureImageResponse(MCastResponse):
+class GetCaptureImageResponse(MCTResponse):
 
     @staticmethod
     def parsable_type_identifier() -> str:

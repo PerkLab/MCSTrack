@@ -1,5 +1,3 @@
-from .get_capture_device_request import GetCaptureDeviceRequest
-from .get_capture_device_response import GetCaptureDeviceResponse
 from .get_capture_image_request import GetCaptureImageRequest
 from .get_capture_image_response import GetCaptureImageResponse
 from .get_capture_properties_request import GetCapturePropertiesRequest
@@ -8,7 +6,6 @@ from .get_detection_parameters_request import GetDetectionParametersRequest
 from .get_detection_parameters_response import GetDetectionParametersResponse
 from .get_marker_snapshots_request import GetMarkerSnapshotsRequest
 from .get_marker_snapshots_response import GetMarkerSnapshotsResponse
-from .set_capture_device_request import SetCaptureDeviceRequest
 from .set_capture_intrinsics_request import SetCaptureIntrinsicsRequest
 from .set_capture_properties_request import SetCapturePropertiesRequest
 from .set_detection_parameters_request import SetDetectionParametersRequest
