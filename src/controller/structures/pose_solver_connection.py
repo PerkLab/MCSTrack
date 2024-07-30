@@ -9,10 +9,9 @@ from src.common.api import \
     MCTResponseSeries
 from src.common.structures import Pose
 from src.pose_solver.api import \
-    AddTargetMarkerResponse, \
-    GetPosesResponse, \
-    StartPoseSolverRequest, \
-    StopPoseSolverRequest
+    PoseSolverGetPosesResponse, \
+    PoseSolverStartRequest, \
+    PoseSolverStopRequest
 import datetime
 import uuid
 
@@ -38,10 +37,10 @@ class PoseSolverConnection(Connection):
         self.poses_timestamp = datetime.datetime.min
 
     def create_deinitialization_request_series(self) -> MCTRequestSeries:
-        return MCTRequestSeries(series=[StopPoseSolverRequest()])
+        return MCTRequestSeries(series=[PoseSolverStopRequest()])
 
     def create_initialization_request_series(self) -> MCTRequestSeries:
-        return MCTRequestSeries(series=[StartPoseSolverRequest()])
+        return MCTRequestSeries(series=[PoseSolverStartRequest()])
 
     def handle_deinitialization_response_series(
         self,
@@ -75,8 +74,7 @@ class PoseSolverConnection(Connection):
 
     def supported_response_types(self) -> list[type[MCTResponse]]:
         return [
-            AddTargetMarkerResponse,
             DequeueStatusMessagesResponse,
             EmptyResponse,
             ErrorResponse,
-            GetPosesResponse]
+            PoseSolverGetPosesResponse]

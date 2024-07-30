@@ -23,13 +23,14 @@ from src.common.structures import \
 from src.controller import \
     MCTController
 from src.pose_solver.api import \
-    AddTargetMarkerRequest, \
-    AddTargetMarkerResponse, \
-    SetReferenceMarkerRequest
+    PoseSolverAddTargetMarkerRequest, \
+    PoseSolverSetReferenceRequest
+from src.pose_solver.structures import \
+    TargetMarker
 import datetime
 import logging
 import platform
-from typing import Final, Optional
+from typing import Final
 import uuid
 import wx
 import wx.grid
@@ -222,9 +223,7 @@ class PoseSolverPanel(BasePanel):
     ) -> None:
         response: MCTResponse
         for response in response_series.series:
-            if isinstance(response, AddTargetMarkerResponse):
-                pass  # we don't currently do anything with this response in this interface
-            elif isinstance(response, ErrorResponse):
+            if isinstance(response, ErrorResponse):
                 self.handle_error_response(response=response)
             elif not isinstance(response, EmptyResponse):
                 self.handle_unknown_response(response=response)
@@ -245,9 +244,9 @@ class PoseSolverPanel(BasePanel):
 
     def on_reference_target_submit_pressed(self, _event: wx.CommandEvent) -> None:
         request_series: MCTRequestSeries = MCTRequestSeries(series=[
-            (SetReferenceMarkerRequest(
+            PoseSolverSetReferenceRequest(
                 marker_id=self._reference_marker_id_spinbox.spinbox.GetValue(),
-                marker_diameter=self._reference_marker_diameter_spinbox.spinbox.GetValue()))])
+                marker_diameter=self._reference_marker_diameter_spinbox.spinbox.GetValue())])
         selected_pose_solver_label: str = self._pose_solver_selector.selector.GetStringSelection()
         self._control_blocking_request_id = self._controller.request_series_push(
             connection_label=selected_pose_solver_label,
@@ -255,10 +254,13 @@ class PoseSolverPanel(BasePanel):
         self._update_ui_controls()
 
     def on_tracked_target_submit_pressed(self, _event: wx.CommandEvent) -> None:
+        target_id: str = str(self._tracked_marker_id_spinbox.spinbox.GetValue())
         request_series: MCTRequestSeries = MCTRequestSeries(series=[
-            (AddTargetMarkerRequest(
-                marker_id=self._tracked_marker_id_spinbox.spinbox.GetValue(),
-                marker_diameter=self._tracked_marker_diameter_spinbox.spinbox.GetValue()))])
+            PoseSolverAddTargetMarkerRequest(
+                target=TargetMarker(
+                    target_id=target_id,
+                    marker_id=target_id,
+                    marker_size=self._tracked_marker_diameter_spinbox.spinbox.GetValue()))])
         selected_pose_solver_label: str = self._pose_solver_selector.selector.GetStringSelection()
         self._control_blocking_request_id = self._controller.request_series_push(
             connection_label=selected_pose_solver_label,

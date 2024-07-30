@@ -23,6 +23,7 @@ from .api import \
     CameraParametersGetRequest, \
     CameraParametersGetResponse, \
     CameraParametersSetRequest, \
+    CameraParametersSetResponse, \
     CameraResolutionGetRequest, \
     CameraResolutionGetResponse, \
     DetectorFrameGetRequest, \
@@ -246,16 +247,18 @@ class Detector(MCTComponent):
             return ErrorResponse(message=e.message)
         return CameraParametersGetResponse(parameters=parameters)
 
-    def camera_parameters_set(self, **kwargs) -> EmptyResponse | ErrorResponse:
+    def camera_parameters_set(self, **kwargs) -> CameraParametersSetResponse | ErrorResponse:
         request: CameraParametersSetRequest = get_kwarg(
             kwargs=kwargs,
             key="request",
             arg_type=CameraParametersSetRequest)
+        new_resolution: ImageResolution
         try:
             self._camera.set_parameters(parameters=request.parameters)
+            new_resolution = self._camera.get_resolution()
         except MCTDetectorRuntimeError as e:
             return ErrorResponse(message=e.message)
-        return EmptyResponse()
+        return CameraParametersSetResponse(resolution=new_resolution)
 
     def camera_resolution_get(self, **_kwargs) -> CameraResolutionGetResponse | ErrorResponse:
         image_resolution: ImageResolution
@@ -272,16 +275,17 @@ class Detector(MCTComponent):
             arg_type=DetectorFrameGetRequest)
         detector_frame: DetectorFrame
         try:
-            response: DetectorFrameGetResponse = DetectorFrameGetResponse(
-                detected_marker_snapshots=None,
-                rejected_marker_snapshots=None)
+            detector_frame = DetectorFrame(
+                detected_marker_snapshots=list(),
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=self._marker.get_changed_timestamp().isoformat())
             if request.include_detected:
-                response.detected_marker_snapshots = self._marker.get_markers_detected()
+                detector_frame.detected_marker_snapshots = self._marker.get_markers_detected()
             if request.include_rejected:
-                response.rejected_marker_snapshots = self._marker.get_markers_rejected()
+                detector_frame.rejected_marker_snapshots = self._marker.get_markers_rejected()
         except MCTDetectorRuntimeError as e:
             return ErrorResponse(message=e.message)
-        return response
+        return DetectorFrameGetResponse(frame=detector_frame)
 
     def detector_start(self, **_kwargs) -> EmptyResponse | ErrorResponse:
         try:

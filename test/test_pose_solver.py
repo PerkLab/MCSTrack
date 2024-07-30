@@ -1,6 +1,9 @@
 from src.pose_solver.pose_solver import PoseSolver
 from src.common.structures import \
+    DetectorFrame, \
     IntrinsicParameters, \
+    MarkerCornerImagePoint, \
+    MarkerSnapshot, \
     Matrix4x4, \
     Pose, \
     MarkerCorners
@@ -11,9 +14,19 @@ from typing import Final
 import unittest
 
 
-REFERENCE_MARKER_ID: Final[int] = 0
-TARGET_MARKER_ID: Final[int] = 1
 MARKER_SIZE_MM: Final[float] = 10.0
+REFERENCE_TARGET_ID: Final[str] = "reference"
+REFERENCE_MARKER_ID: Final[str] = "0"
+REFERENCE_MARKER_TARGET: Final[TargetMarker] = TargetMarker(
+    target_id=REFERENCE_TARGET_ID,
+    marker_id=REFERENCE_MARKER_ID,
+    marker_size=MARKER_SIZE_MM)
+TARGET_TARGET_ID: Final[str] = "target"
+TARGET_MARKER_ID: Final[str] = "1"
+TARGET_MARKER_TARGET: Final[TargetMarker] = TargetMarker(
+    target_id=TARGET_TARGET_ID,
+    marker_id=TARGET_MARKER_ID,
+    marker_size=MARKER_SIZE_MM)
 DETECTOR_RED_NAME: Final[str] = "det_red"
 DETECTOR_RED_INTRINSICS: Final[IntrinsicParameters] = IntrinsicParameters(
     focal_length_x_px=639.868693422552,
@@ -92,34 +105,30 @@ class TestPoseSolver(unittest.TestCase):
         pose_solver.set_intrinsic_parameters(
             detector_label=DETECTOR_RED_NAME,
             intrinsic_parameters=DETECTOR_RED_INTRINSICS)
-        pose_solver.set_reference_target(
-            target=TargetMarker(
-                marker_id=REFERENCE_MARKER_ID,
-                marker_size=MARKER_SIZE_MM))
-        pose_solver.add_target_marker(
-            marker_id=TARGET_MARKER_ID,
-            marker_diameter=MARKER_SIZE_MM)
+        pose_solver.add_target(target=REFERENCE_MARKER_TARGET)
+        pose_solver.add_target(target=TARGET_MARKER_TARGET)
+        pose_solver.set_reference_target(target_id=REFERENCE_MARKER_TARGET.target_id)
         # Reference is on the left, target is on the right, both in the same plane and along the x-axis of the image.
-        pose_solver.add_marker_corners(
-            detected_corners=[
-                MarkerCorners(
-                    detector_label=DETECTOR_RED_NAME,
-                    marker_id=REFERENCE_MARKER_ID,
-                    points=[
-                        [375, 347],
-                        [415, 346],
-                        [416, 386],
-                        [376, 386]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_RED_NAME,
-                    marker_id=TARGET_MARKER_ID,
-                    points=[
-                        [541, 347],
-                        [581, 348],
-                        [580, 388],
-                        [540, 387]],
-                    timestamp=now_utc)])
+        pose_solver.add_detector_frame(
+            detector_label=DETECTOR_RED_NAME,
+            detector_frame=DetectorFrame(
+                detected_marker_snapshots=[
+                    MarkerSnapshot(
+                        label=str(REFERENCE_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=375, y_px=347),
+                            MarkerCornerImagePoint(x_px=415, y_px=346),
+                            MarkerCornerImagePoint(x_px=416, y_px=386),
+                            MarkerCornerImagePoint(x_px=376, y_px=386)]),
+                    MarkerSnapshot(
+                        label=str(TARGET_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=541, y_px=347),
+                            MarkerCornerImagePoint(x_px=581, y_px=348),
+                            MarkerCornerImagePoint(x_px=580, y_px=388),
+                            MarkerCornerImagePoint(x_px=540, y_px=387)])],
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=now_utc.isoformat()))
         pose_solver.update()
         detector_poses: list[Pose]
         target_poses: list[Pose]
@@ -167,87 +176,89 @@ class TestPoseSolver(unittest.TestCase):
         pose_solver.set_intrinsic_parameters(
             detector_label=DETECTOR_YELLOW_NAME,
             intrinsic_parameters=DETECTOR_YELLOW_INTRINSICS)
-        pose_solver.set_reference_target(
-            target=TargetMarker(
-                marker_id=REFERENCE_MARKER_ID,
-                marker_size=MARKER_SIZE_MM))
-        pose_solver.add_target_marker(
-            marker_id=TARGET_MARKER_ID,
-            marker_diameter=MARKER_SIZE_MM)
-        pose_solver.add_marker_corners(
-            detected_corners=[
-                MarkerCorners(
-                    detector_label=DETECTOR_RED_NAME,
-                    marker_id=REFERENCE_MARKER_ID,
-                    points=[
-                        [157, 210],
-                        [165, 221],
-                        [139, 229],
-                        [131, 217]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_RED_NAME,
-                    marker_id=TARGET_MARKER_ID,
-                    points=[
-                        [196, 266],
-                        [206, 281],
-                        [178, 291],
-                        [167, 275]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_SKY_NAME,
-                    marker_id=REFERENCE_MARKER_ID,
-                    points=[
-                        [190, 234],
-                        [219, 246],
-                        [195, 270],
-                        [166, 257]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_SKY_NAME,
-                    marker_id=TARGET_MARKER_ID,
-                    points=[
-                        [317, 290],
-                        [352, 306],
-                        [332, 333],
-                        [296, 317]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_GREEN_NAME,
-                    marker_id=REFERENCE_MARKER_ID,
-                    points=[
-                        [247, 304],
-                        [283, 296],
-                        [291, 326],
-                        [254, 334]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_GREEN_NAME,
-                    marker_id=TARGET_MARKER_ID,
-                    points=[
-                        [392, 277],
-                        [426, 271],
-                        [438, 299],
-                        [403, 305]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_YELLOW_NAME,
-                    marker_id=REFERENCE_MARKER_ID,
-                    points=[
-                        [275, 277],
-                        [289, 251],
-                        [321, 261],
-                        [306, 288]],
-                    timestamp=now_utc),
-                MarkerCorners(
-                    detector_label=DETECTOR_YELLOW_NAME,
-                    marker_id=TARGET_MARKER_ID,
-                    points=[
-                        [332, 177],
-                        [344, 156],
-                        [372, 163],
-                        [361, 185]],
-                    timestamp=now_utc)])
+        pose_solver.add_target(target=REFERENCE_MARKER_TARGET)
+        pose_solver.add_target(target=TARGET_MARKER_TARGET)
+        pose_solver.set_reference_target(target_id=REFERENCE_MARKER_TARGET.target_id)
+        pose_solver.add_detector_frame(
+            detector_label=DETECTOR_RED_NAME,
+            detector_frame=DetectorFrame(
+                detected_marker_snapshots=[
+                    MarkerSnapshot(
+                        label=str(REFERENCE_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=157, y_px=210),
+                            MarkerCornerImagePoint(x_px=165, y_px=221),
+                            MarkerCornerImagePoint(x_px=139, y_px=229),
+                            MarkerCornerImagePoint(x_px=131, y_px=217)]),
+                    MarkerSnapshot(
+                        label=str(TARGET_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=196, y_px=266),
+                            MarkerCornerImagePoint(x_px=206, y_px=281),
+                            MarkerCornerImagePoint(x_px=178, y_px=291),
+                            MarkerCornerImagePoint(x_px=167, y_px=275)])],
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=now_utc.isoformat()))
+        pose_solver.add_detector_frame(
+            detector_label=DETECTOR_SKY_NAME,
+            detector_frame=DetectorFrame(
+                detected_marker_snapshots=[
+                    MarkerSnapshot(
+                        label=str(REFERENCE_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=190, y_px=234),
+                            MarkerCornerImagePoint(x_px=219, y_px=246),
+                            MarkerCornerImagePoint(x_px=195, y_px=270),
+                            MarkerCornerImagePoint(x_px=166, y_px=257)]),
+                    MarkerSnapshot(
+                        label=str(TARGET_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=317, y_px=290),
+                            MarkerCornerImagePoint(x_px=352, y_px=306),
+                            MarkerCornerImagePoint(x_px=332, y_px=333),
+                            MarkerCornerImagePoint(x_px=296, y_px=317)])],
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=now_utc.isoformat()))
+        pose_solver.add_detector_frame(
+            detector_label=DETECTOR_GREEN_NAME,
+            detector_frame=DetectorFrame(
+                detected_marker_snapshots=[
+                    MarkerSnapshot(
+                        label=str(REFERENCE_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=247, y_px=304),
+                            MarkerCornerImagePoint(x_px=283, y_px=296),
+                            MarkerCornerImagePoint(x_px=291, y_px=326),
+                            MarkerCornerImagePoint(x_px=254, y_px=334)]),
+                    MarkerSnapshot(
+                        label=str(TARGET_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=392, y_px=277),
+                            MarkerCornerImagePoint(x_px=426, y_px=271),
+                            MarkerCornerImagePoint(x_px=438, y_px=299),
+                            MarkerCornerImagePoint(x_px=403, y_px=305)])],
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=now_utc.isoformat()))
+        pose_solver.add_detector_frame(
+            detector_label=DETECTOR_YELLOW_NAME,
+            detector_frame=DetectorFrame(
+                detected_marker_snapshots=[
+                    MarkerSnapshot(
+                        label=str(REFERENCE_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=275, y_px=277),
+                            MarkerCornerImagePoint(x_px=289, y_px=251),
+                            MarkerCornerImagePoint(x_px=321, y_px=261),
+                            MarkerCornerImagePoint(x_px=306, y_px=288)]),
+                    MarkerSnapshot(
+                        label=str(TARGET_MARKER_ID),
+                        corner_image_points=[
+                            MarkerCornerImagePoint(x_px=332, y_px=177),
+                            MarkerCornerImagePoint(x_px=344, y_px=156),
+                            MarkerCornerImagePoint(x_px=372, y_px=163),
+                            MarkerCornerImagePoint(x_px=361, y_px=185)])],
+                rejected_marker_snapshots=list(),
+                timestamp_utc_iso8601=now_utc.isoformat()))
         pose_solver.update()
         detector_poses: list[Pose]
         target_poses: list[Pose]

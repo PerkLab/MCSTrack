@@ -2,7 +2,7 @@
 import datetime  # for testing, not needed for the algorithm itself
 import numpy
 from scipy.spatial.transform import Rotation
-from src.pose_solver.structures.ray import Ray
+from src.pose_solver.structures import Ray
 from .closest_point_on_ray import closest_point_on_ray
 from .register_corresponding_points import register_corresponding_points
 

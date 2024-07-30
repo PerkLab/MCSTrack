@@ -3,12 +3,12 @@ from src.common import \
     MCTResponse
 from src.common.structures import \
     CaptureFormat, \
+    DetectorFrame, \
     DetectionParameters, \
     IntrinsicCalibration, \
     ImageResolution, \
     KeyValueMetaAny, \
-    KeyValueSimpleAny, \
-    MarkerSnapshot
+    KeyValueSimpleAny
 from .structures import \
     CalibrationImageMetadata, \
     CalibrationImageState, \
@@ -196,6 +196,7 @@ class CameraImageGetRequest(MCTRequest):
 
     parsable_type: str = Field(default=parsable_type_identifier(), const=True)
     format: CaptureFormat = Field()
+    requested_resolution: ImageResolution | None = Field(default=None)
 
 
 class CameraImageGetResponse(MCTResponse):
@@ -236,6 +237,16 @@ class CameraParametersSetRequest(MCTRequest):
     parameters: list[KeyValueSimpleAny] = Field()
 
 
+class CameraParametersSetResponse(MCTResponse):
+
+    @staticmethod
+    def parsable_type_identifier() -> str:
+        return "detector_camera_parameters_set"
+
+    parsable_type: str = Field(default=parsable_type_identifier(), const=True)
+    resolution: ImageResolution = Field()  # Sometimes parameter changes may result in changes of resolution
+
+
 class CameraResolutionGetRequest(MCTRequest):
     @staticmethod
     def parsable_type_identifier() -> str:
@@ -269,8 +280,7 @@ class DetectorFrameGetResponse(MCTResponse):
         return "detector_frame_get"
 
     parsable_type: str = Field(default=parsable_type_identifier(), const=True)
-    detected_marker_snapshots: list[MarkerSnapshot] | None = Field()
-    rejected_marker_snapshots: list[MarkerSnapshot] | None = Field()
+    frame: DetectorFrame = Field()
 
 
 class DetectorStartRequest(MCTRequest):

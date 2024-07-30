@@ -29,11 +29,10 @@ from src.detector.api import \
     DetectorFrameGetRequest, \
     DetectorFrameGetResponse
 from src.pose_solver.api import \
-    AddTargetMarkerResponse, \
-    AddMarkerCornersRequest, \
-    GetPosesRequest, \
-    GetPosesResponse, \
-    SetIntrinsicParametersRequest
+    PoseSolverAddDetectorFrameRequest, \
+    PoseSolverGetPosesRequest, \
+    PoseSolverGetPosesResponse, \
+    PoseSolverSetIntrinsicRequest
 import datetime
 from enum import IntEnum, StrEnum
 import logging
@@ -142,7 +141,7 @@ class MCTController(MCTComponent):
                                 message=f"Failed to find DetectorConnection with label {detector_label}.")
                             continue
                         if detector_connection.current_intrinsic_parameters is not None:
-                            requests.append(SetIntrinsicParametersRequest(
+                            requests.append(PoseSolverSetIntrinsicRequest(
                                 detector_label=detector_label,
                                 intrinsic_parameters=detector_connection.current_intrinsic_parameters))
                     request_series: MCTRequestSeries = MCTRequestSeries(series=requests)
@@ -238,10 +237,7 @@ class MCTController(MCTComponent):
             connection_type=DetectorConnection)
         if detector_connection is None:
             return None
-        return DetectorFrame(
-            detected_marker_snapshots=detector_connection.detected_marker_snapshots,
-            rejected_marker_snapshots=detector_connection.rejected_marker_snapshots,
-            timestamp_utc_iso8601=detector_connection.marker_snapshot_timestamp.isoformat())
+        return detector_connection.latest_frame
 
     def get_live_pose_solver_frame(
         self,
@@ -328,14 +324,11 @@ class MCTController(MCTComponent):
                 severity="error",
                 message=f"Failed to find DetectorConnection with label {detector_label}.")
             return
-        detector_connection.detected_marker_snapshots = response.detected_marker_snapshots
-        detector_connection.rejected_marker_snapshots = response.rejected_marker_snapshots
-        detector_connection.marker_snapshot_timestamp = \
-            datetime.datetime.utcnow()  # TODO: This should come from the detector
+        detector_connection.latest_frame = response.frame
 
     def handle_response_get_poses(
         self,
-        response: GetPosesResponse,
+        response: PoseSolverGetPosesResponse,
         pose_solver_label: str
     ) -> None:
         pose_solver_connection: PoseSolverConnection = self._get_connection(
@@ -386,9 +379,7 @@ class MCTController(MCTComponent):
         success: bool = True
         response: MCTResponse
         for response in response_series.series:
-            if isinstance(response, AddTargetMarkerResponse):
-                pass  # we don't currently do anything with this response in this interface
-            elif isinstance(response, CalibrationResultGetActiveResponse):
+            if isinstance(response, CalibrationResultGetActiveResponse):
                 self.handle_response_calibration_result_get_active(
                     response=response,
                     detector_label=response_series.responder)
@@ -400,7 +391,7 @@ class MCTController(MCTComponent):
                 self.handle_response_detector_frame_get(
                     response=response,
                     detector_label=response_series.responder)
-            elif isinstance(response, GetPosesResponse):
+            elif isinstance(response, PoseSolverGetPosesResponse):
                 self.handle_response_get_poses(
                     response=response,
                     pose_solver_label=response_series.responder)
@@ -571,13 +562,11 @@ class MCTController(MCTComponent):
                         if current_is_new:
                             pose_solver_connection.detector_timestamps[detector_label] = \
                                 current_detector_frame_timestamp
-                            marker_request: AddMarkerCornersRequest = AddMarkerCornersRequest(
-                                detected_marker_snapshots=current_detector_frame.detected_marker_snapshots,
-                                rejected_marker_snapshots=current_detector_frame.rejected_marker_snapshots,
+                            marker_request: PoseSolverAddDetectorFrameRequest = PoseSolverAddDetectorFrameRequest(
                                 detector_label=detector_label,
-                                detector_timestamp_utc_iso8601=current_detector_frame.timestamp_utc_iso8601)
+                                detector_frame=current_detector_frame)
                             solver_request_list.append(marker_request)
-                    solver_request_list.append(GetPosesRequest())
+                    solver_request_list.append(PoseSolverGetPosesRequest())
                     request_series: MCTRequestSeries = MCTRequestSeries(series=solver_request_list)
                     pose_solver_connection.request_id = self.request_series_push(
                         connection_label=pose_solver_label,

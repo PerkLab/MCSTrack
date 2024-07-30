@@ -1,18 +1,15 @@
 from .api import \
-    AddMarkerCornersRequest, \
-    AddTargetMarkerRequest, \
-    AddTargetMarkerResponse, \
-    GetPosesRequest, \
-    GetPosesResponse, \
-    SetIntrinsicParametersRequest, \
-    SetReferenceMarkerRequest, \
-    StartPoseSolverRequest, \
-    StopPoseSolverRequest
+    PoseSolverAddDetectorFrameRequest, \
+    PoseSolverAddTargetMarkerRequest, \
+    PoseSolverGetPosesRequest, \
+    PoseSolverGetPosesResponse, \
+    PoseSolverSetIntrinsicRequest, \
+    PoseSolverSetReferenceRequest, \
+    PoseSolverStartRequest, \
+    PoseSolverStopRequest
 from .exceptions import PoseSolverException
-from .fileio import PoseSolverConfiguration
 from .pose_solver import PoseSolver
 from .structures import \
-    TargetMarker
 from src.common import \
     EmptyResponse, \
     ErrorResponse, \
@@ -24,15 +21,11 @@ from src.common.structures import \
     Pose, \
     PoseSolverStatus, \
     MarkerCorners
-import datetime
 import logging
 from typing import Callable
 
+
 logger = logging.getLogger(__name__)
-
-
-def dummy_function(_: dict) -> MCTResponse:
-    return EmptyResponse()
 
 
 class PoseSolverAPI(MCTComponent):
@@ -53,88 +46,63 @@ class PoseSolverAPI(MCTComponent):
         self._pose_solver = pose_solver
         self._status = PoseSolverStatus()
 
-    async def internal_update(self):
-        if self._status.solve_status == PoseSolverStatus.Solve.RUNNING:
-            self._pose_solver.update()
-
-    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
-        return_value: dict[type[MCTRequest], Callable[[dict], MCTResponse]] = super().supported_request_types()
-        return_value.update({
-            AddMarkerCornersRequest: self.add_marker_corners,
-            AddTargetMarkerRequest: self.add_target_marker,
-            GetPosesRequest: self.get_poses,
-            SetIntrinsicParametersRequest: self.set_intrinsic_parameters,
-            SetReferenceMarkerRequest: self.set_reference_marker,
-            StartPoseSolverRequest: self.start_pose_solver,
-            StopPoseSolverRequest: self.stop_pose_solver})
-        return return_value
-
-    def add_marker_corners(self, **kwargs) -> EmptyResponse:
-        request: AddMarkerCornersRequest = get_kwarg(
+    def add_detector_frame(self, **kwargs) -> EmptyResponse | ErrorResponse:
+        request: PoseSolverAddDetectorFrameRequest = get_kwarg(
             kwargs=kwargs,
             key="request",
-            arg_type=AddMarkerCornersRequest)
-        detector_timestamp_utc: datetime.datetime = datetime.datetime.fromisoformat(
-            request.detector_timestamp_utc_iso8601)  # TODO: ErrorResponse if formatted incorrectly?
-        detected_corners: list[MarkerCorners] = [
-            MarkerCorners(
+            arg_type=PoseSolverAddDetectorFrameRequest)
+        try:
+            self._pose_solver.add_detector_frame(
                 detector_label=request.detector_label,
-                marker_id=int(detected_marker_snapshot.label),
-                points=[
-                    [detected_marker_snapshot.corner_image_points[i].x_px,
-                     detected_marker_snapshot.corner_image_points[i].y_px]
-                    for i in range(0, 4)],
-                timestamp=detector_timestamp_utc)
-            for detected_marker_snapshot in request.detected_marker_snapshots]
-        self._pose_solver.add_marker_corners(detected_corners=detected_corners)
+                detector_frame=request.detector_frame)
+        except PoseSolverException as e:
+            return ErrorResponse(message=e.message)
         return EmptyResponse()
 
-    def add_target_marker(self, **kwargs) -> AddTargetMarkerResponse | ErrorResponse:
-        request: AddTargetMarkerRequest = get_kwarg(
+    def add_target(self, **kwargs) -> EmptyResponse | ErrorResponse:
+        request: PoseSolverAddTargetMarkerRequest = get_kwarg(
             kwargs=kwargs,
             key="request",
-            arg_type=AddTargetMarkerRequest)
+            arg_type=PoseSolverAddTargetMarkerRequest)
         try:
-            target_id: str = self._pose_solver.add_target_marker(
-                marker_id=request.marker_id,
-                marker_diameter=request.marker_diameter)
+            self._pose_solver.add_target(target=request.target)
         except PoseSolverException as e:
-            return ErrorResponse(
-                message=e.message)
-        return AddTargetMarkerResponse(
-            target_id=target_id)
+            return ErrorResponse(message=e.message)
+        return EmptyResponse()
 
-    def get_poses(self, **_kwargs) -> GetPosesResponse:
+    def get_poses(self, **_kwargs) -> PoseSolverGetPosesResponse | ErrorResponse:
         detector_poses: list[Pose]
         target_poses: list[Pose]
-        detector_poses, target_poses = self._pose_solver.get_poses()
-        return GetPosesResponse(
+        try:
+            detector_poses, target_poses = self._pose_solver.get_poses()
+        except PoseSolverException as e:
+            return ErrorResponse(message=e.message)
+        return PoseSolverGetPosesResponse(
             detector_poses=detector_poses,
             target_poses=target_poses)
 
     def set_intrinsic_parameters(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        request: SetIntrinsicParametersRequest = get_kwarg(
+        request: PoseSolverSetIntrinsicRequest = get_kwarg(
             kwargs=kwargs,
             key="request",
-            arg_type=SetIntrinsicParametersRequest)
-        self._pose_solver.set_intrinsic_parameters(
-            detector_label=request.detector_label,
-            intrinsic_parameters=request.intrinsic_parameters)
+            arg_type=PoseSolverSetIntrinsicRequest)
+        try:
+            self._pose_solver.set_intrinsic_parameters(
+                detector_label=request.detector_label,
+                intrinsic_parameters=request.intrinsic_parameters)
+        except PoseSolverException as e:
+            return ErrorResponse(message=e.message)
         return EmptyResponse()
 
     def set_reference_marker(self, **kwargs) -> EmptyResponse | ErrorResponse:
-        request: SetReferenceMarkerRequest = get_kwarg(
+        request: PoseSolverSetReferenceRequest = get_kwarg(
             kwargs=kwargs,
             key="request",
-            arg_type=SetReferenceMarkerRequest)
+            arg_type=PoseSolverSetReferenceRequest)
         try:
-            self._pose_solver.set_reference_target(
-                TargetMarker(
-                    marker_id=request.marker_id,
-                    marker_size=request.marker_diameter))
+            self._pose_solver.set_reference_target(target_id=str(request.marker_id))
         except PoseSolverException as e:
-            return ErrorResponse(
-                message=e.message)
+            return ErrorResponse(message=e.message)
         return EmptyResponse()
 
     def start_pose_solver(self, **_kwargs) -> EmptyResponse:
@@ -144,3 +112,19 @@ class PoseSolverAPI(MCTComponent):
     def stop_pose_solver(self, **_kwargs) -> EmptyResponse:
         self._status.solve_status = PoseSolverStatus.Solve.STOPPED
         return EmptyResponse()
+
+    def supported_request_types(self) -> dict[type[MCTRequest], Callable[[dict], MCTResponse]]:
+        return_value: dict[type[MCTRequest], Callable[[dict], MCTResponse]] = super().supported_request_types()
+        return_value.update({
+            PoseSolverAddDetectorFrameRequest: self.add_detector_frame,
+            PoseSolverAddTargetMarkerRequest: self.add_target,
+            PoseSolverGetPosesRequest: self.get_poses,
+            PoseSolverSetIntrinsicRequest: self.set_intrinsic_parameters,
+            PoseSolverSetReferenceRequest: self.set_reference_marker,
+            PoseSolverStartRequest: self.start_pose_solver,
+            PoseSolverStopRequest: self.stop_pose_solver})
+        return return_value
+
+    async def update(self):
+        if self._status.solve_status == PoseSolverStatus.Solve.RUNNING:
+            self._pose_solver.update()

@@ -8,9 +8,9 @@ from src.common.api import \
     MCTResponse, \
     MCTResponseSeries
 from src.common.structures import \
+    DetectorFrame, \
     ImageResolution, \
-    IntrinsicParameters, \
-    MarkerSnapshot
+    IntrinsicParameters
 from src.detector.api import \
     CalibrationCalculateResponse, \
     CalibrationImageAddResponse, \
@@ -22,12 +22,12 @@ from src.detector.api import \
     CalibrationResultMetadataListResponse, \
     CameraImageGetResponse, \
     CameraParametersGetResponse, \
+    CameraParametersSetResponse, \
     CameraResolutionGetResponse, \
     DetectorFrameGetResponse, \
     DetectorStartRequest, \
     DetectorStopRequest, \
     MarkerParametersGetResponse
-import datetime
 import uuid
 
 
@@ -37,9 +37,7 @@ class DetectorConnection(Connection):
     request_id: uuid.UUID | None
     current_resolution: ImageResolution | None
     current_intrinsic_parameters: IntrinsicParameters | None
-    detected_marker_snapshots: list[MarkerSnapshot]
-    rejected_marker_snapshots: list[MarkerSnapshot]
-    marker_snapshot_timestamp: datetime.datetime
+    latest_frame: DetectorFrame | None
 
     def __init__(
         self,
@@ -49,9 +47,7 @@ class DetectorConnection(Connection):
         self.request_id = None
         self.current_resolution = None
         self.current_intrinsic_parameters = None
-        self.detected_marker_snapshots = list()
-        self.rejected_marker_snapshots = list()
-        self.marker_snapshot_timestamp = datetime.datetime.min
+        self.latest_frame = None
 
     def create_deinitialization_request_series(self) -> MCTRequestSeries:
         return MCTRequestSeries(series=[DetectorStopRequest()])
@@ -101,6 +97,7 @@ class DetectorConnection(Connection):
             CalibrationResultMetadataListResponse,
             CameraImageGetResponse,
             CameraParametersGetResponse,
+            CameraParametersSetResponse,
             CameraResolutionGetResponse,
             DequeueStatusMessagesResponse,
             DetectorFrameGetResponse,

@@ -1,6 +1,6 @@
 import numpy
 from typing import List
-from src.pose_solver.structures.ray import Ray
+from src.pose_solver.structures import Ray
 
 
 EPSILON: float = 0.0001

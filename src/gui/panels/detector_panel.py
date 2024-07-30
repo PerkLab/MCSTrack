@@ -44,8 +44,7 @@ from src.detector.api import \
     CameraParametersGetRequest, \
     CameraParametersGetResponse, \
     CameraParametersSetRequest, \
-    DetectorFrameGetRequest, \
-    DetectorFrameGetResponse, \
+    CameraParametersSetResponse, \
     MarkerParametersGetRequest, \
     MarkerParametersGetResponse, \
     MarkerParametersSetRequest
@@ -620,12 +619,7 @@ class DetectorPanel(BasePanel):
     def begin_capture_snapshot(self):
         selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
         request_series: MCTRequestSeries = MCTRequestSeries(
-            series=[
-                CameraImageGetRequest(
-                    format=_CAPTURE_FORMAT),
-                DetectorFrameGetRequest(
-                    detected_marker_snapshots=True,
-                    rejected_marker_snapshots=True)])
+            series=[CameraImageGetRequest(format=_CAPTURE_FORMAT)])
         self._live_preview_request_id = self._controller.request_series_push(
             connection_label=selected_detector_label,
             request_series=request_series)
@@ -723,17 +717,15 @@ class DetectorPanel(BasePanel):
         for response in response_series.series:
             if isinstance(response, CalibrationImageAddResponse):
                 self._handle_add_calibration_image_response(response=response)
+            elif isinstance(response, CameraImageGetResponse):
+                self._handle_capture_snapshot_response(response=response)
             elif isinstance(response, CameraParametersGetResponse):
                 self._handle_get_capture_parameters_response(response=response)
             elif isinstance(response, MarkerParametersGetResponse):
                 self._handle_get_detection_parameters_response(response=response)
-            elif isinstance(response, CameraImageGetResponse):
-                self._handle_capture_snapshot_response(response=response)
-            elif isinstance(response, DetectorFrameGetResponse):
-                self._handle_marker_snapshot_response(response=response)
             elif isinstance(response, ErrorResponse):
                 self.handle_error_response(response=response)
-            elif not isinstance(response, EmptyResponse):
+            elif not isinstance(response, (EmptyResponse, CameraParametersSetResponse)):
                 self.handle_unknown_response(response=response)
 
     def _handle_add_calibration_image_response(
@@ -887,13 +879,6 @@ class DetectorPanel(BasePanel):
             self._detection_param_min_side_length_canonical_img.spinbox.SetValue(
                 params.min_side_length_canonical_img)
 
-    def _handle_marker_snapshot_response(
-        self,
-        response: DetectorFrameGetResponse
-    ):
-        self._live_markers_detected = response.detected_marker_snapshots
-        self._live_markers_rejected = response.rejected_marker_snapshots
-
     @staticmethod
     def _marker_snapshot_list_to_opencv_points(
         marker_snapshot_list: list[MarkerSnapshot],
@@ -1013,9 +998,12 @@ class DetectorPanel(BasePanel):
             self._update_ui_image()
 
     def _update_ui_controls(self):
+        self._detector_selector.set_enabled(enable=False)
         self._set_display_controls_enabled(enable=False)
         self._set_parameter_controls_enabled(enable=False)
         self._calibration_capture_button.Enable(enable=False)
+        if not self._controller.is_running():
+            return
         self._detector_selector.set_enabled(enable=True)
         selected_detector_label: str = self._detector_selector.selector.GetStringSelection()
         if selected_detector_label is None or len(selected_detector_label) <= 0:
