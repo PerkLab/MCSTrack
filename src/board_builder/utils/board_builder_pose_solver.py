@@ -753,7 +753,7 @@ class BoardBuilderPoseSolver:
             self._poses_by_target_id[target_id] = pose
 
     def _update(self):
-        now_timestamp = datetime.datetime.now()
+        now_timestamp = datetime.datetime.utcnow()
         self._now_timestamp = now_timestamp
         poses_need_update: bool = self._clear_old_values(now_timestamp)
         poses_need_update |= len(self._marker_corners_since_update) > 0

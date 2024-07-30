@@ -94,9 +94,6 @@ class BoardBuilderPanel(BasePanel):
             name=name)
 
         self._controller = controller
-        self._calibration_result_get_active_request_ids = {}
-        self._calibration_request_map = {}
-        self._detector_intrinsics = {}
 
         self.timer = wx.Timer(self)
         self._locating_reference = False
@@ -115,6 +112,8 @@ class BoardBuilderPanel(BasePanel):
             (255, 0, 0),  # Blue
             (0, 255, 255),  # Cyan
         ]
+
+        self._detector_intrinsics = {}
 
         ### USER INTERFACE FUNCTIONALITIES AND BUTTONS ###
         self.horizontal_split_sizer: wx.BoxSizer = wx.BoxSizer(
@@ -305,47 +304,28 @@ class BoardBuilderPanel(BasePanel):
         if self._renderer is not None:
             self._renderer.render()
 
-        if len(self._detector_intrinsics) != len(self._controller.get_active_detector_labels()):  # Check if we got all intrinsics
-            if self._calibration_result_get_active_request_ids is not None:
-                for detector_name in self._calibration_result_get_active_request_ids:
-                    request_id, response_series = self._controller.response_series_pop(
-                        request_series_id=self._calibration_result_get_active_request_ids[detector_name])
-                    if response_series is not None:
+        if self._controller.is_running():
+            detector_data: dict[str, list[MarkerSnapshot]] = {}
+            for preview in self.live_detector_previews:
+                if preview.image_request_id is None:
+                    self._begin_capture_snapshot(preview)
+
+                detector_label = preview.detector_label
+                preview.detector_frame = self._controller.get_live_detector_frame(
+                    detector_label=detector_label)
+                self._process_frame(preview)
+
+                # The detector frames (updated above) are used for getting the detected corners
+                # The detector images are the actual view of the camera, and are displayed in the GUI
+                if preview.image_request_id is not None:
+                    preview.image_request_id, response_series = self._controller.response_series_pop(
+                        request_series_id=preview.image_request_id)
+                    if response_series is not None:  # self._live_preview_request_id will be None
                         self.handle_response_series(response_series)
 
-            for detector_label in self._controller.get_active_detector_labels():
-                if detector_label not in self._calibration_result_get_active_request_ids:
-                    request = CalibrationResultGetActiveRequest()
-                    request_series = MCTRequestSeries(series=[request])
-                    request_id = self._controller.request_series_push(
-                        connection_label=detector_label,
-                        request_series=request_series)
-                    self._calibration_result_get_active_request_ids[detector_label] = request_id
-                    self._calibration_request_map[request_id] = detector_label
-
-        else:
-            if self._controller.is_running():
-                detector_data: dict[str, list[MarkerSnapshot]] = {}
-                for preview in self.live_detector_previews:
-                    if preview.image_request_id is None:
-                        self._begin_capture_snapshot(preview)
-
-                    detector_label = preview.detector_label
-                    preview.detector_frame = self._controller.get_live_detector_frame(
-                        detector_label=detector_label)
-                    self._process_frame(preview)
-
-                    # The detector frames (updated above) are used for getting the detected corners
-                    # The detector images are the actual view of the camera, and are displayed in the GUI
-                    if preview.image_request_id is not None:
-                        preview.image_request_id, response_series = self._controller.response_series_pop(
-                            request_series_id=preview.image_request_id)
-                        if response_series is not None:  # self._live_preview_request_id will be None
-                            self.handle_response_series(response_series)
-
-                    detector_data[detector_label] = preview.detector_frame.detected_marker_snapshots
-                if detector_data:
-                    self._run_board_builder(detector_data)
+                detector_data[detector_label] = preview.detector_frame.detected_marker_snapshots
+            if detector_data:
+                self._run_board_builder(detector_data)
         self.Refresh()
 
     # Used for updating the GUI camera preview
@@ -379,7 +359,6 @@ class BoardBuilderPanel(BasePanel):
     ) -> None:
         if response:
             self._detector_intrinsics[responder] = response.intrinsic_calibration.calibrated_values
-            print(self._detector_intrinsics)
 
     def _handle_capture_snapshot_response(
             self,
@@ -422,6 +401,8 @@ class BoardBuilderPanel(BasePanel):
         self._marker_size = self._tracked_marker_diameter_spinbox.spinbox.GetValue()
         self.board_builder.pose_solver.set_board_marker_size(self._marker_size)
         self._locate_reference_button.Enable(True)
+        for detector_label in self._controller.get_active_detector_labels():
+            self._detector_intrinsics[detector_label] = self._controller.get_live_detector_intrinsics(detector_label)
 
     def _on_display_mode_changed(self, _event: wx.CommandEvent):
         if self._preview_image_checkbox.checkbox.GetValue():
@@ -509,7 +490,7 @@ class BoardBuilderPanel(BasePanel):
         pose_solver_frame = PoseSolverFrame(
             detector_poses=detector_poses,
             target_poses=target_poses,
-            timestamp_utc_iso8601=str(datetime.datetime.now())
+            timestamp_utc_iso8601=str(datetime.datetime.utcnow())
         )
 
         ### RENDERER ###
@@ -560,6 +541,5 @@ class BoardBuilderPanel(BasePanel):
             self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
 
         elif self._building_board:
-            corners_dict = self.board_builder.build_board(detector_data)
-            self._render_frame(self.board_builder.detector_poses,
-                               self.board_builder.target_poses + self.board_builder.occluded_poses)
+            corners_dict = self.board_builder.build_board()
+            self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
