@@ -234,7 +234,7 @@ class BoardBuilder:
         relative_pose_matrix = [[entry.get_matrix() if entry is not None else None for entry in row] for
                                 row in self._relative_pose_matrix]
 
-        # TODO: Reference is hard coded to zero right now
+        # TODO: Current reference/origin marker is hard coded to the first marker of the matrix
         reference_face = 0
         identity_matrix = np.eye(4)
 

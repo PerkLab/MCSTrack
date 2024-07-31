@@ -98,7 +98,6 @@ class BoardBuilderPanel(BasePanel):
         self.timer = wx.Timer(self)
         self._locating_reference = False
         self._collecting_data = False
-        self._building_board = False
 
         self._tracked_target_poses = list()
         self._latest_pose_solver_frames = dict()
@@ -382,9 +381,8 @@ class BoardBuilderPanel(BasePanel):
         return return_value
 
     def _on_build_board_button_click(self, event: wx.CommandEvent) -> None:
-        self._setting_reference = False
-        self._collecting_data = False
-        self._building_board = True
+        corners_dict = self.board_builder.build_board()
+        self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
 
     def _on_collect_data_button_click(self, event: wx.CommandEvent) -> None:
         if self._collect_data_button.GetValue():
@@ -392,7 +390,6 @@ class BoardBuilderPanel(BasePanel):
             self._build_board_button.Enable(True)
             self._locating_reference = False
             self._collecting_data = True
-            self._building_board = False
         else:
             self._collect_data_button.SetLabel("Collect Data")
             self._collecting_data = False
@@ -440,7 +437,6 @@ class BoardBuilderPanel(BasePanel):
             self._collect_data_button.Enable(False)
             self._locating_reference = True
             self._collecting_data = False
-            self._building_board = False
         else:
             self._locate_reference_button.SetLabel("Locate Reference")
             self._locating_reference = False
@@ -490,7 +486,7 @@ class BoardBuilderPanel(BasePanel):
         pose_solver_frame = PoseSolverFrame(
             detector_poses=detector_poses,
             target_poses=target_poses,
-            timestamp_utc_iso8601=str(datetime.datetime.utcnow())
+            timestamp_utc_iso8601=datetime.datetime.utcnow().isoformat()
         )
 
         ### RENDERER ###
@@ -526,7 +522,6 @@ class BoardBuilderPanel(BasePanel):
         self._build_board_button.Enable(False)
         self._locating_reference = False
         self._collecting_data = False
-        self._building_board = False
         self.board_builder = BoardBuilder()
 
     def _run_board_builder(self, detector_data):
@@ -538,8 +533,4 @@ class BoardBuilderPanel(BasePanel):
 
         elif self._collecting_data:
             corners_dict = self.board_builder.collect_data(detector_data)
-            self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
-
-        elif self._building_board:
-            corners_dict = self.board_builder.build_board()
             self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
