@@ -22,9 +22,29 @@
 
 Cable colours are just a suggestion to help differentiate them. You can use whatever convention you like, or get all the same colour.
 
-# Environment Setup
+# Router Setup
 
-This set up is necessary for running the pose solver and GUI. Please see the section that pertains to your operating system below.
+Coming soon.
+
+# Detector Setup
+
+This system is intended to be used over a LAN connecting Raspberry Pi -based detector(s) and a main computer. The Raspberry Pi's run the ```src.main_detector```, while the main computer runs the ```src.main_pose_solver``` and optionally the ```src.gui.gui``` module. For a diagram, please see below.
+
+![diagram_1](diagram.png)
+
+To setup the Raspberry Pi -based detectors, 
+1. Download the latest OS image (.zip file) under Releases on the main web page of this repository. 
+   - Alternatively, run the setup/create_image.sh script on a compatible linux system, which will generate the OS image from scratch
+2. Flash the resulting image to a microSD card (or multiple) for use.
+   - Plug microSD card into a compatible port, or adapter, on the computer where you downloaded the OS image
+   - Use a flashing software, such as (Etcher)[https://etcher.balena.io/], to flash the OS image downloaded in step (1) to the microSD card
+   - Once flashing is complete, remove the microSD card from the computer, and plug it into the Raspberry Pi.
+   - Power up the Pi by ethernet.
+   - To confirm the Pi is working, run a network scan (e.g., (nmap)[https://nmap.org/]) before and after connecting the Pi to the network. Consult the IP address assigned in `Router Setup` to ensure the Pi is connected. 
+
+# Software Environment Setup
+
+This set up is necessary for running the pose solver and GUI on the host machine. After cloning this repository, please see the section that pertains to your operating system below.
 
 ### Windows
 
@@ -60,14 +80,8 @@ pip install -r requirements.txt
 wxPython wheel failure, try: https://wxpython.org/blog/2017-08-17-builds-for-linux-with-pip/index.html
 
 
-# Detector Setup
-
-This system is intended to be used over a LAN connecting Raspberry Pi -based detector(s) and a main computer. The Raspberry Pi's run the ```src.main_detector```, while the main computer runs the ```src.main_pose_solver``` and optionally the ```src.gui.gui``` module.
-
-To setup the Raspberry Pi -based detectors, download the latest OS image under Releases. Alternatively, run the setup/create_image.sh script on a compatible linux system. Flash the resulting image to a microSD card (or multiple) for use.
-
-Connect the Raspberry Pi and host machine to the LAN. On the host machine, with the python virtualenv activated (see platform-specific instructions above), run the ```src.main_pose_solver``` and ```src.gui.gui``` modules - either through command line, or your IDE of choice for debugging. 
-
 # GUI Usage
+
+On the host machine, with the python virtualenv activated (see platform-specific instructions above), run the ```src.main_pose_solver``` and ```src.gui.gui``` modules - either through command line, or your IDE of choice for debugging. 
 
 Using the GUI, add the IP address and port (8001) of the detector. For the pose solver, the IP address will be localhost and port 8000. To use the pose solver renderer (Windows only), the detector must first be calibrated using a board of markers - as described by https://docs.opencv.org/4.x/da/d13/tutorial_aruco_calibration.html. In the detector panel, with the 'preview image' option checked, capture calibration images of the board at a variety of angles. In the calibrator panel, you can select which ones to use to generate a calibration. Once that is complete, you can set the reference and tracked markers in the pose solver panel, and begin tracking. 
