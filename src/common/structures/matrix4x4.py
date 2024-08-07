@@ -33,6 +33,10 @@ class Matrix4x4(BaseModel):
         result_numpy_array = numpy.matmul(self.as_numpy_array(), other.as_numpy_array())
         return Matrix4x4(values=list(result_numpy_array.flatten()))
 
+    def inverse(self) -> 'Matrix4x4':
+        inv_numpy_array = numpy.linalg.inv(self.as_numpy_array())
+        return Matrix4x4.from_numpy_array(inv_numpy_array)
+
     @staticmethod
     def from_raw_values(
         v00, v01, v02, v03,
