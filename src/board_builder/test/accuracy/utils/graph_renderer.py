@@ -65,8 +65,8 @@ def graph_renderer(snapshots, all_collection_data, reference_to_detector_poses):
             center = corners.mean(axis=0)
             ax.text(center[0], center[1], f'{marker_id}', fontsize=8, ha='center', va='center', color=color)
 
-        ax_green.set_title('Detector Green')
-        ax_blue.set_title('Detector Blue')
+        ax_green.set_title('Camera 1')
+        ax_blue.set_title('Camera 2')
 
         # Fixed width and height
         fixed_width = parameters.DETECTOR_FRAME_WIDTH
@@ -77,7 +77,7 @@ def graph_renderer(snapshots, all_collection_data, reference_to_detector_poses):
         # Plot points
         for i, (data, color) in enumerate(zip(all_collection_data, colors)):
             for detector, marker_snapshots in data.items():
-                ax = ax_green if detector == 'detector_green' else ax_blue
+                ax = ax_green if detector == 'camera 1' else ax_blue
                 for marker_snapshot in marker_snapshots:
                     corners = np.array([(corner.x_px, corner.y_px) for corner in marker_snapshot.corner_image_points])
                     plot_quadrilateral(ax, corners, f'M{marker_snapshot.label}S{i}', color)

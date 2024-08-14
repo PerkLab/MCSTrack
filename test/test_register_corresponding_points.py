@@ -1,4 +1,4 @@
-from src.pose_solver.util.register_corresponding_points import register_corresponding_points
+from src.common.util import register_corresponding_points
 import numpy
 from scipy.spatial.transform import Rotation
 import unittest

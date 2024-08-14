@@ -49,7 +49,8 @@ def compute_distances_to_mean(data, mean_corners):
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    input_file = os.path.join(script_dir, 'data.json')
+    script_name = 'top_data.json'  # top_data.json, planar_data.json
+    input_file = os.path.join(script_dir, 'planar_data.json')
 
     mean_corners, data = compute_mean_corners(input_file)
     mean_distance, std_distance = compute_distances_to_mean(data, mean_corners)

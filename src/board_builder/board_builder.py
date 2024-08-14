@@ -32,7 +32,6 @@ class BoardBuilder:
         self.detector_poses = list()
         self.target_poses = list()
         self.marker_size = marker_size
-        # TODO: Could combine the following into something like dict[index, list[id, uuid]] to be more clean
         self._index_to_marker_uuid = dict()
         self._index_to_marker_id = dict()
         self.pose_solver = BoardBuilderPoseSolver()
@@ -168,14 +167,14 @@ class BoardBuilder:
                 self._matrix_uuid_index += 1
 
     @staticmethod
-    def _write_corners_dict_to_repeatability_test_file(corners_dict):
+    def _write_corners_dict_to_repeatability_test_file(corners_dict, filename):
         corners_dict_serializable = {k: v.tolist() for k, v in corners_dict.items()}
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         repeatability_dir = os.path.join(script_dir, 'test', 'repeatability')
         if not os.path.exists(repeatability_dir):
             os.makedirs(repeatability_dir)
-        file_path = os.path.join(repeatability_dir, 'board_builder_results.json')
+        file_path = os.path.join(repeatability_dir, filename)
 
         data = []
         if os.path.exists(file_path):
@@ -344,7 +343,7 @@ class BoardBuilder:
             predicted_corners[marker_id] = corners
 
         if repeatability_testing:
-            self._write_corners_dict_to_repeatability_test_file(predicted_corners)
+            self._write_corners_dict_to_repeatability_test_file(predicted_corners, 'cube_data.json')
 
         # Convert to target board
         markers = []

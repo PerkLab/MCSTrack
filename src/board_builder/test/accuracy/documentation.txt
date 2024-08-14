@@ -8,4 +8,3 @@ FOLDERS:
 Board_definitions: Where the user can define the boards in 3D space to be generated
 Structures: Parameters
 Utils: Algorithms
-Ignore accuracy_test_copy.py and data.py, setup.txt

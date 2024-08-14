@@ -14,7 +14,6 @@ from .util import \
     closest_intersection_between_n_lines, \
     IterativeClosestPointParameters, \
     iterative_closest_point_for_points_and_rays, \
-    register_corresponding_points, \
     transformation_image_to_opengl, \
     vector_image_to_opengl
 from src.common.structures import \
@@ -23,6 +22,7 @@ from src.common.structures import \
     Matrix4x4, \
     Pose, \
     MarkerCorners
+from src.common.util import register_corresponding_points
 import cv2
 import cv2.aruco
 import datetime

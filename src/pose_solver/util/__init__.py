@@ -12,4 +12,3 @@ from .iterative_closest_point import \
 from .line_intersection import \
     closest_intersection_between_two_lines, \
     closest_intersection_between_n_lines
-from .register_corresponding_points import register_corresponding_points

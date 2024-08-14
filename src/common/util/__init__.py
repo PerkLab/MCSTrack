@@ -1,1 +1,2 @@
 from .io_utils import IOUtils
+from .register_corresponding_points import register_corresponding_points
