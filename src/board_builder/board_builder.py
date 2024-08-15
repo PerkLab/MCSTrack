@@ -8,7 +8,8 @@ from typing import Final
 
 from .utils import BoardBuilderPoseSolver
 from .structures import PoseLocation
-from src.common.structures import Pose, MarkerSnapshot, MarkerCorners, Matrix4x4
+from src.common.structures import Pose, MarkerSnapshot, MarkerCorners
+from .utils.graph_search import create_graph, bfs_shortest_path, get_transform_from_root
 from ..pose_solver.structures import Marker, TargetBoard
 
 _HOMOGENEOUS_POINT_COORD: Final[int] = 4
@@ -309,20 +310,33 @@ class BoardBuilder:
         return corners_dict
 
     def build_board(self, repeatability_testing=False):
-        # TODO: Build board isn't currently able to get the positions of markers with no direct relation with the
-        #  reference (appeared in the same frame more than once). A search algorithm needs to be developed
-
-        if not self.relative_pose_matrix:
-            return
         self.target_poses = []
         predicted_corners = {}
-        relative_pose_matrix = [[entry.get_matrix() if entry is not None else None for entry in row] for
-                                row in self.relative_pose_matrix]
+        if not self.relative_pose_matrix:
+            return
 
         # TODO: Current reference/origin marker is coded to the index with the lowest marker id. An algorithm could be
         #  developed to determine "most reliable marker" to put as the root of the search tree
         index_with_smallest_value = min(self._index_to_marker_id, key=self._index_to_marker_id.get)
         reference_face = self._index_to_marker_id[index_with_smallest_value]
+
+        graph = create_graph(self.relative_pose_matrix, self._index_to_marker_id)
+        shortest_paths = bfs_shortest_path(graph, reference_face)
+
+        print(f"Shortest paths from Node {reference_face}:")
+        for node_id, path in shortest_paths.items():
+            print(f" - To Node {node_id}: {' -> '.join(path)}")
+
+        transform_matrices = get_transform_from_root(shortest_paths, reference_face, self.relative_pose_matrix, self._index_to_marker_id)
+
+        # Compute the corners for each node
+        for node_id, transform_matrix in transform_matrices.items():
+            t_matrix_np = transform_matrix.as_numpy_array()
+            corners = self._calculate_corners_location(t_matrix_np, self.local_corners)
+            predicted_corners[node_id] = corners
+
+        """relative_pose_matrix = [[entry.get_matrix() if entry is not None else None for entry in row] for
+                                row in self.relative_pose_matrix]
         identity_matrix = np.eye(4)
 
         for index, marker_id in self._index_to_marker_id.items():
@@ -340,10 +354,10 @@ class BoardBuilder:
                     solver_timestamp_utc_iso8601=str(datetime.datetime.utcnow()))
                 self.target_poses.append(pose)
                 corners = self._calculate_corners_location(T, self.local_corners)
-            predicted_corners[marker_id] = corners
+            predicted_corners[marker_id] = corners"""
 
         if repeatability_testing:
-            self._write_corners_dict_to_repeatability_test_file(predicted_corners, 'cube_data.json')
+            self._write_corners_dict_to_repeatability_test_file(predicted_corners, 'top_data.json')
 
         # Convert to target board
         markers = []
