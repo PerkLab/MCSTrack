@@ -135,7 +135,7 @@ class BoardBuilder:
 
         return pose_index, other_pose_index
 
-    def _solve_pose(self, detector_data: dict[str, list[MarkerSnapshot]], timestamp: datetime.datetime):
+    def _solve_pose(self, detector_data: dict[str, list[MarkerSnapshot]]):
         """ Given marker ids and its corner locations, find its pose """
         timestamp = datetime.datetime.utcnow()
         for detector_name in detector_data:
@@ -273,7 +273,7 @@ class BoardBuilder:
         timestamp = datetime.datetime.utcnow()
         corners_dict = {}
         self.target_poses = []
-        self._solve_pose(detector_data, timestamp)
+        self._solve_pose(detector_data)
         for index, pose in enumerate(self.target_poses):
             # R R R T
             # R R R T
