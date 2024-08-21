@@ -4,7 +4,7 @@ import numpy as np
 import importlib
 import json
 
-from .structures import AccuracyTestParameters
+from src.board_builder.test.accuracy.structures import AccuracyTestParameters
 from src.board_builder.board_builder import BoardBuilder
 from src.common.util import register_corresponding_points
 from src.common.structures import \
@@ -12,7 +12,7 @@ from src.common.structures import \
     MarkerSnapshot, \
     TargetBoard, \
     Marker
-from .utils import \
+from src.board_builder.test.accuracy.utils import \
     generate_virtual_snapshots, \
     generate_data, \
     graph_renderer
