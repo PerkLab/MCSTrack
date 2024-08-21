@@ -13,9 +13,9 @@ class AccuracyTestParameters:
     # Scene generation
     BOARD_MARKER_SIZE = 10  # Size of the markers in mm
     NUMBER_OF_SNAPSHOTS = 10  # Number of scenes generated for the collection of data
-    SCENE_GENERATION_X_BOUNDS = (200, 300)  # (200, 300)
-    SCENE_GENERATION_Y_BOUNDS = (-50, 50)  # (-50, 50)
-    SCENE_GENERATION_Z_BOUNDS = (0, 100)  # (0, 100)
+    SCENE_GENERATION_X_BOUNDS = (240, 250)  # (200, 300)  Make sure that the generated boards are within the frame or the RMS goes crazy
+    SCENE_GENERATION_Y_BOUNDS = (-10, 10)  # (-20, 20)
+    SCENE_GENERATION_Z_BOUNDS = (0, 50)  # (0, 100)
     SCENE_GENERATION_ROTATION_LIMIT = 30  # Amount of degrees a marker can rotate from its original definition
 
     # Plotting
