@@ -8,6 +8,14 @@ def create_graph(
     relative_pose_matrix: List[List[PoseLocation | None]],
     index_to_marker_id: Dict[int, str]
 ) -> Dict[str, MatrixNode]:
+    """
+    Description: This is a BFS search algorithm to search for the location of every marker relative to the reference marker
+                 Most markers have a direct relationship to the reference marker, but in case it is not (ex: cube with opposite faces)
+                 this algorithm will find the shortest and most reliable (path with more frames) path to that marker.
+                 Check board_builder/test/graph_search_test.py to see this implemented in a simulated experiment.
+    TO DO: Implement this in the board builder algorithm, in the build_board() method. Currently, it can only determine the location
+           of markers with direct relation to the reference.
+    """
     # Create a dictionary to store all nodes by their id
     nodes: Dict[str, MatrixNode] = {}
 

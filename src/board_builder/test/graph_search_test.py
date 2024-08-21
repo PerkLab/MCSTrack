@@ -3,6 +3,10 @@ import datetime
 from src.common.structures import Matrix4x4
 from src.board_builder.utils.graph_search import create_graph, bfs_shortest_path, get_transform_from_root
 
+"""
+Description: Test case for the BFS/graph_search algorithm
+"""
+
 # Example relative_pose_matrix and index_to_marker_id
 # Example 1
 t1 = Matrix4x4(values=[
