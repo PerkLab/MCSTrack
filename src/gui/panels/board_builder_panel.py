@@ -453,9 +453,7 @@ class BoardBuilderPanel(BasePanel):
         target_board = self.board_builder.build_board()
         self._render_frame(self.board_builder.detector_poses, self.board_builder.target_poses)
 
-        #print(target_board)
         target_board_json = target_board.json(indent=4)
-        print(target_board_json)
 
         # Write result to file
         file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'board_builder',
@@ -531,6 +529,7 @@ class BoardBuilderPanel(BasePanel):
             self.board_builder.repeatability_testing = False
 
     def _on_reset_button_click(self, event: wx.CommandEvent) -> None:
+        # TODO: Avoid using reset button for now as it is bugged (I think it's carrying over data from before)
         self._locate_reference_button.Enable(False)
         self._collect_data_button.Enable(False)
         self._build_board_button.Enable(False)

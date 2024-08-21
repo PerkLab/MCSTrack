@@ -176,7 +176,7 @@ class BoardBuilder:
                 self._matrix_uuid_index += 1
 
     def _write_corners_dict_to_repeatability_test_file(self, corners_dict):
-        corners_dict_serializable = {k: v.tolist() for k, v in corners_dict.items()}
+        corners_dict_serializable = {k: v.tolist() for k, v in sorted(corners_dict.items())}
         filename = f'{self.board_label}_data.json'
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -242,7 +242,7 @@ class BoardBuilder:
 
     # public methods
     def locate_reference_board(self, detector_data: dict[str, list[MarkerSnapshot]]):
-        self._write_detector_data_to_recording_file(detector_data, "LOCATE REFERENCE DATA")
+        # self._write_detector_data_to_recording_file(detector_data, "LOCATE REFERENCE DATA")
         if all(isinstance(v, list) and len(v) == 0 for v in detector_data.values()):
             return
         self.detector_poses = []
@@ -277,7 +277,7 @@ class BoardBuilder:
 
     def collect_data(self, detector_data: dict[str, list[MarkerSnapshot]]):
         """ Collects data of relative position and is entered in matrix. Returns a dictionary of its corners"""
-        self._write_detector_data_to_recording_file(detector_data, "COLLECTION DATA")
+        # self._write_detector_data_to_recording_file(detector_data, "COLLECTION DATA")
         detector_data = self._filter_markers_appearing_in_multiple_detectors(detector_data)
         if all(isinstance(v, list) and len(v) == 0 for v in detector_data.values()):
             return
