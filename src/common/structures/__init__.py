@@ -51,6 +51,7 @@ from .status_message import \
     SEVERITY_LABEL_TO_INT, \
     StatusMessage
 from .target import \
+    Marker, \
     TargetBase, \
     TargetBoard, \
     TargetMarker

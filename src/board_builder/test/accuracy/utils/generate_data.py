@@ -83,8 +83,6 @@ def generate_data(board_coordinates, detector_poses, remove_markers_out_of_frame
     for pose in detector_poses:
         marker_snapshot_list = []
         transform_matrix = pose.object_to_reference_matrix.as_numpy_array()
-        camera_pos = transform_matrix[:3, 3]
-        intersection = find_z_axis_intersection(pose.object_to_reference_matrix)
 
         for marker in board_coordinates:
 
@@ -94,7 +92,7 @@ def generate_data(board_coordinates, detector_poses, remove_markers_out_of_frame
 
             marker_corners = []
             for corner in board_coordinates[marker]:
-                pixel = projection(corner, camera_pos, intersection, parameters.DETECTOR_INTRINSICS)
+                pixel = projection(corner, pose.object_to_reference_matrix, parameters.DETECTOR_INTRINSICS)
                 # Check if marker out of frame
                 if remove_markers_out_of_frame and (not pixel or not (0 < pixel[0] < parameters.DETECTOR_FRAME_WIDTH) or not (0 < pixel[1] < parameters.DETECTOR_FRAME_HEIGHT)):
                     break

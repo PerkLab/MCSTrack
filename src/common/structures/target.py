@@ -3,7 +3,7 @@ import numpy
 from pydantic import BaseModel, Field, PrivateAttr
 
 
-class _Marker(BaseModel):
+class Marker(BaseModel):
     marker_id: str = Field()
     marker_size: float | None = Field(default=None)
     points: list[list[float]] | None = Field(default=None)
@@ -50,7 +50,7 @@ class TargetBase(BaseModel, abc.ABC):
     def get_points(self) -> list[list[float]]: ...
 
 
-class TargetMarker(TargetBase, _Marker):
+class TargetMarker(TargetBase, Marker):
     def get_marker_ids(self) -> list[str]:
         return [self.marker_id]
 
@@ -64,8 +64,8 @@ class TargetMarker(TargetBase, _Marker):
 
 
 class TargetBoard(TargetBase):
-    markers: list[_Marker] = Field()
-    _marker_dict: None | dict[str, _Marker] = PrivateAttr()
+    markers: list[Marker] = Field()
+    _marker_dict: None | dict[str, Marker] = PrivateAttr()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
