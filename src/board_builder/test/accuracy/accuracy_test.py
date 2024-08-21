@@ -72,7 +72,10 @@ class AccuracyTest:
         simulated_points: list[list[float]] = simulated_board.get_points()
 
         # Get the transformation matrix
-        transformation_matrix = register_corresponding_points(target_points, simulated_points)
+        transformation_matrix = register_corresponding_points(
+            point_set_from=target_points,
+            point_set_to=simulated_points,
+            use_oomori_mirror_fix=False)
 
         # Apply the transformation to all markers in the target_board
         aligned_markers = []

@@ -9,7 +9,8 @@ def register_corresponding_points(
     point_set_from: list[list[float]],
     point_set_to: list[list[float]],
     collinearity_do_check: bool = True,
-    collinearity_zero_threshold: float = 0.0001
+    collinearity_zero_threshold: float = 0.0001,
+    use_oomori_mirror_fix: bool = True
 ) -> numpy.array:  # 4x4 transformation matrix, indexed by [row,col]
     """
     :param point_set_from:
@@ -59,7 +60,8 @@ def register_corresponding_points(
     covariance = numpy.matmul(centered_points_from.T, centered_points_to)
     u, _, vh = numpy.linalg.svd(covariance)
     s = numpy.identity(3, dtype="float32")  # s will be the Oomori mirror fix
-    s[2, 2] = numpy.linalg.det(numpy.matmul(u, vh))
+    if use_oomori_mirror_fix:
+        s[2, 2] = numpy.linalg.det(numpy.matmul(u, vh))
     rotation = numpy.matmul(u, numpy.matmul(s, vh)).transpose()
     translation = centroid_to - numpy.matmul(rotation, centroid_from)
     matrix = numpy.identity(4, dtype="float32")
