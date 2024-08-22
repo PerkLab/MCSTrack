@@ -29,7 +29,8 @@ from src.detector.api import \
     DetectorFrameGetResponse, \
     DetectorStartRequest, \
     DetectorStopRequest, \
-    MarkerParametersGetResponse
+    MarkerParametersGetResponse, \
+    MarkerParametersSetRequest
 import uuid
 
 
@@ -69,6 +70,8 @@ class DetectorConnection(Connection):
         series: list[MCTRequest] = [DetectorStartRequest()]
         if self.configured_camera_parameters is not None:
             series.append(CameraParametersSetRequest(parameters=self.configured_camera_parameters))
+        if self.configured_marker_parameters is not None:
+            series.append(MarkerParametersSetRequest(parameters=self.configured_marker_parameters))
         return MCTRequestSeries(series=series)
 
     def handle_deinitialization_response_series(

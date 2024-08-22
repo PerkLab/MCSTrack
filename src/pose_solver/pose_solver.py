@@ -427,6 +427,9 @@ class PoseSolver:
             if len(marker_ids_with_intersections) <= 0 and len(marker_ids_with_rays) <= 0:
                 continue  # No information on which to base a pose
 
+            if len(detector_labels) < self._parameters.minimum_detector_count:
+                continue
+
             # NB. len() == 0 or less for either of these indicates an internal error
             one_detector_only: bool = (len(detector_labels) == 1)
             if one_detector_only:

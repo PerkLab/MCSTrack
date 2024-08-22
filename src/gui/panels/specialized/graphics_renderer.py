@@ -79,8 +79,8 @@ class GraphicsRenderer(GLCanvas, wx.Window):
         super().__init__(parent=parent)
 
         self._fov_degrees = 45.0
-        self._near_plane_distance = 1.0
-        self._far_plane_distance = 10000.0
+        self._near_plane_distance = 10.0
+        self._far_plane_distance = 100000.0
         self._background_color = [0.4, 0.45, 0.5, 1.0]
 
         self._perspective_target = [0.0, 0.0, 0.0]

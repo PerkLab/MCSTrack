@@ -118,6 +118,7 @@ class PoseSolverConfiguration(BaseModel):
 
 
 class PoseSolverParameters(BaseModel):
+    minimum_detector_count: int = Field(default=2)
     MAXIMUM_RAY_COUNT_FOR_INTERSECTION: int = Field(2)
     POSE_MULTI_CAMERA_LIMIT_RAY_AGE_SECONDS: float = Field(0.1)
     POSE_SINGLE_CAMERA_EXTRAPOLATION_MINIMUM_SURFACE_NORMAL_ANGLE_DEGREES: float = Field(15.0)

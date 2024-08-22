@@ -139,7 +139,7 @@ class MCTController(MCTComponent):
             if detector.camera_parameters is not None:
                 detector_connection.configured_camera_parameters = detector.camera_parameters
             if detector.marker_parameters is not None:
-                detector_connection.configured_camera_parameters = detector.marker_parameters
+                detector_connection.configured_marker_parameters = detector.marker_parameters
         for pose_solver in configuration.pose_solvers:
             if not is_valid_ip_address(pose_solver):
                 continue
