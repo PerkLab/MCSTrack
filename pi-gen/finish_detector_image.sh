@@ -2,7 +2,7 @@
 
 
 echo "Setting up for image creation..."
-cp config_detector pi-gen/detector
+cp config_detector pi-gen/config_detector
 cd pi-gen
 cp -r ../stage6_detector stage6_detector
 chmod +x stage6_detector/prerun.sh
