@@ -8,7 +8,7 @@ sudo apt install -y coreutils quilt parted qemu-user-static debootstrap zerofree
 
 echo "Cloning pi-gen repository..."
 if [ -d "pi-gen" ]; then
-    rm -r pi-gen
+    sudo rm -r pi-gen
 fi
 git clone --branch arm64 https://github.com/RPI-Distro/pi-gen.git
 

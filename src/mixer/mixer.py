@@ -366,4 +366,7 @@ class Mixer(MCTComponent):
         if self.time_sync_active:
             return
         if self._status == Mixer.Status.RUNNING:
-            self._pose_solver.update()
+            try:
+                self._pose_solver.update()
+            except Exception as e:
+                logger.error(e)
