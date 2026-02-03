@@ -1,0 +1,5 @@
+#!/bin/bash
+cd /home/admin/MCSTrack
+source .venv/bin/activate
+export MCSTRACK_MIXER_CONFIGURATION_FILEPATH="/home/admin/MCSTrack/data/configuration/mixer/aruco.json"
+python -m src.main_mixer

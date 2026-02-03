@@ -14,23 +14,24 @@ git clone --branch arm64 https://github.com/RPI-Distro/pi-gen.git
 
 
 echo "Setting up for image creation..."
-cp config pi-gen
+cp config_base pi-gen/config_base
 cd pi-gen
 touch ./stage3/SKIP
 touch ./stage4/SKIP
 touch ./stage5/SKIP
 touch ./stage4/SKIP_IMAGES
 touch ./stage5/SKIP_IMAGES
-cp -r ../stage6 stage6
 chmod +x build.sh
-chmod +x stage6/prerun.sh
-chmod +x stage6/00_custom/01-run.sh
-chmod +x stage6/00_custom/02-run-chroot.sh
 
 
 echo "Building image..."
-./build.sh
+sudo ./build.sh -c config_base
 exitCode=$?
 if [ $exitCode -ne 0 ]; then
     echo "Exited with code ${exitCode}" ; exit -1
+else
+    touch ./stage0/SKIP
+    touch ./stage1/SKIP
+    touch ./stage2/SKIP
+    touch ./stage2/SKIP_IMAGES
 fi

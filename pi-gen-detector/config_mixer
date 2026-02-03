@@ -1,0 +1,8 @@
+export IMG_NAME=mcstrack-mixer
+export LOCALE_DEFAULT=en_US.UTF-8
+export TIMEZONE_DEFAULT=America/Toronto
+export DISABLE_FIRST_BOOT_USER_RENAME=1
+export FIRST_USER_NAME=admin
+export FIRST_USER_PASS="admin"
+export ENABLE_SSH=0
+export STAGE_LIST="stage0 stage1 stage2 stage6_mixer"
